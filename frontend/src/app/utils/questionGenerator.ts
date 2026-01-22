@@ -79,6 +79,7 @@ export function generateAllQuestions(
   // Blind Draw
   if (rounds.includes('blind-draw')) {
     const difficulty = roundSettings.blindDrawDifficulty || 'medium-hard';
+    const count = Math.max(roundSettings.blindDrawWordCount || 5, 1);
     const wordPool = difficulty === 'easy' 
       ? blindDrawWords.easy 
       : difficulty === 'hard'
@@ -86,7 +87,7 @@ export function generateAllQuestions(
       : blindDrawWords.medium;
     
     generated.blindDraw = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < count; i++) {
       generated.blindDraw.push(getRandomFromArray(wordPool));
     }
   }

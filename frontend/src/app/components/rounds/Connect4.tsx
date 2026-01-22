@@ -586,7 +586,7 @@ export function Connect4({
                     onClick={handlePickNewColumn}
                     size="lg"
                     variant="outline"
-                    className="border-white/30 text-white hover:bg-white/10"
+                    className="border-white/30 bg-transparent text-white hover:bg-white/10"
                   >
                     Pick New Theme
                   </Button>

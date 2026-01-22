@@ -35,6 +35,7 @@ export function GuessNumber({
     timeRemaining: roundSeconds,
   });
   const [revealed, setRevealed] = useState(false);
+  const [manualWinnerTeamId, setManualWinnerTeamId] = useState<string | null>(null);
   const [results, setResults] = useState<
     Array<{
       teamId: string;
@@ -137,6 +138,7 @@ export function GuessNumber({
     });
     setRevealed(false);
     setResults([]);
+    setManualWinnerTeamId(null);
     setQuestionIndex(prev => prev + 1);
   };
 
@@ -189,7 +191,7 @@ export function GuessNumber({
     setQuestionsAsked(prev => prev + 1);
 
     const isTie = calculated.length >= 2 && calculated[0].difference === calculated[1].difference;
-    if (calculated.length >= 1 && !isTie) {
+    if (calculated.length >= 1 && !isTie && gameId) {
       onUpdateScore(calculated[0].teamId, 200);
     }
   };
@@ -203,6 +205,19 @@ export function GuessNumber({
   useEffect(() => {
     startRound();
   }, []);
+
+  const handleManualWinnerSelect = (teamId: string) => {
+    if (manualWinnerTeamId) return;
+    setManualWinnerTeamId(teamId);
+    onUpdateScore(teamId, 200);
+    setState(prev => ({
+      ...prev,
+      isActive: false,
+      timeRemaining: 0,
+    }));
+    setRevealed(true);
+    setQuestionsAsked(prev => prev + 1);
+  };
 
   return (
     <div className="space-y-6">
@@ -272,6 +287,31 @@ export function GuessNumber({
                 })}
               </div>
 
+              {!gameId && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-bold text-white mb-3 text-center">Pick a Winner (Manual)</h3>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {teams.map(team => (
+                      <Button
+                        key={team.id}
+                        onClick={() => handleManualWinnerSelect(team.id)}
+                        size="lg"
+                        disabled={!!manualWinnerTeamId}
+                        className="text-white"
+                        style={{ backgroundColor: team.color }}
+                      >
+                        Award 200 to {team.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {manualWinnerTeamId && (
+                    <p className="text-center text-green-300 mt-3">
+                      Winner selected.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {!revealed && !state.isActive && (
                 <div className="mt-6 text-center text-blue-200">
                   Time is up! Calculating closest guesses…
@@ -298,7 +338,11 @@ export function GuessNumber({
               </div>
               {results.length > 0 && (
                 <div className="text-center text-white">
-                  {results.length >= 2 && results[0].difference === results[1].difference ? (
+                  {manualWinnerTeamId ? (
+                    <div className="text-green-300 font-semibold">
+                      Winner: {teams.find(team => team.id === manualWinnerTeamId)?.name}
+                    </div>
+                  ) : results.length >= 2 && results[0].difference === results[1].difference ? (
                     <div className="text-yellow-300 font-semibold">It's a tie!</div>
                   ) : (
                     <div className="text-green-300 font-semibold">
@@ -310,6 +354,33 @@ export function GuessNumber({
             </CardContent>
           </Card>
 
+          {!gameId && (
+            <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+              <CardContent className="pt-6">
+                <h3 className="text-xl font-bold text-white mb-4 text-center">Pick a Winner</h3>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {teams.map(team => (
+                    <Button
+                      key={team.id}
+                      onClick={() => handleManualWinnerSelect(team.id)}
+                      size="lg"
+                      disabled={!!manualWinnerTeamId}
+                      className="text-white"
+                      style={{ backgroundColor: team.color }}
+                    >
+                      Award 200 to {team.name}
+                    </Button>
+                  ))}
+                </div>
+                {manualWinnerTeamId && (
+                  <p className="text-center text-green-300 mt-4">
+                    Winner selected.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
             <CardContent className="pt-6">
               <h3 className="text-2xl font-bold text-white mb-6 text-center">Results</h3>
@@ -317,7 +388,13 @@ export function GuessNumber({
                 {results.map((result, index) => {
                   const team = teams.find(t => t.id === result.teamId);
                   const isTie = results.length >= 2 && results[0].difference === results[1].difference;
-                  const points = !isTie && index === 0 ? 200 : 0;
+                  const points = manualWinnerTeamId
+                    ? result.teamId === manualWinnerTeamId
+                      ? 200
+                      : 0
+                    : !isTie && index === 0
+                      ? 200
+                      : 0;
                   
                   return (
                     <motion.div

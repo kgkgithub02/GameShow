@@ -9,7 +9,7 @@ import { Scoreboard } from '@/app/components/Scoreboard';
 import { HostGameCode } from '@/app/components/player/HostGameCode';
 import { Team, Difficulty, RoundType, RoundSettings } from '@/app/types/game';
 import { GeneratedQuestions } from '@/app/utils/questionGenerator';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { SkipForward, RotateCcw, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,6 +25,7 @@ interface GameControllerProps {
   gameId: string | null;
   gameCode: string | null;
   onReset: () => void;
+  onUpdateLocalScore?: (teamId: string, points: number) => void;
 }
 
 const ROUND_NAMES: Record<RoundType, string> = {
@@ -45,6 +46,7 @@ export function GameController({
   gameId,
   gameCode,
   onReset,
+  onUpdateLocalScore,
 }: GameControllerProps) {
   const { teams: syncedTeams, gameState, game } = useGameSync(gameId);
   const teams = useMemo(() => (syncedTeams.length ? syncedTeams : initialTeams), [syncedTeams, initialTeams]);
@@ -58,14 +60,23 @@ export function GameController({
   const [showInstructions, setShowInstructions] = useState(true); // Start with instructions
   const [gameComplete, setGameComplete] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
+  const [roundBreakdowns, setRoundBreakdowns] = useState<
+    Array<{ roundType: RoundType; scores: Array<{ teamId: string; teamName: string; points: number }> }>
+  >([]);
+  const roundStartScoresRef = useRef<Record<string, number> | null>(null);
+  const roundStartIndexRef = useRef<number | null>(null);
 
   const updateScore = (teamId: string, points: number) => {
-    if (!gameId) return;
+    if (!gameId) {
+      onUpdateLocalScore?.(teamId, points);
+      return;
+    }
     updateTeamScore(teamId, points).catch(() => undefined);
   };
 
   const nextRound = () => {
     if (currentRoundIndex < rounds.length - 1) {
+      finalizeRoundScores();
       setShowTransition(true);
       setTimeout(() => {
         setCurrentRoundIndex(prev => prev + 1);
@@ -73,15 +84,18 @@ export function GameController({
         setShowTransition(false);
       }, 2000);
     } else {
+      finalizeRoundScores();
       setGameComplete(true);
     }
   };
 
   const skipRound = () => {
     if (currentRoundIndex < rounds.length - 1) {
+      finalizeRoundScores();
       setCurrentRoundIndex(prev => prev + 1);
       setShowInstructions(true); // Show instructions for next round
     } else {
+      finalizeRoundScores();
       setGameComplete(true);
     }
   };
@@ -96,19 +110,25 @@ export function GameController({
 
   const handleCompleteRound = () => {
     if (currentRoundIndex < rounds.length - 1) {
+      finalizeRoundScores();
       setCurrentRoundIndex(prev => prev + 1);
       setShowInstructions(true); // Show instructions for next round
     } else {
+      finalizeRoundScores();
       setGameComplete(true);
     }
   };
 
   const currentRound = rounds[currentRoundIndex];
-  const winner = [...teams].sort((a, b) => b.score - a.score)[0];
+  const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+  const topScore = sortedTeams[0]?.score ?? 0;
+  const topTeams = sortedTeams.filter(team => team.score === topScore);
+  const isTie = topTeams.length > 1;
+  const winner = sortedTeams[0];
 
   useEffect(() => {
     if (!game) return;
-    if (typeof game.current_round === 'number' && game.current_round !== currentRoundIndex) {
+    if (typeof game.current_round === 'number' && game.current_round > currentRoundIndex) {
       setCurrentRoundIndex(game.current_round);
     }
     if (game.status === 'completed') {
@@ -144,6 +164,29 @@ export function GameController({
     }).catch(() => undefined);
   }, [gameId, showInstructions, showTransition, rounds, currentRoundIndex, gameState]);
 
+  useEffect(() => {
+    if (showInstructions) return;
+    roundStartScoresRef.current = Object.fromEntries(teams.map(team => [team.id, team.score]));
+    roundStartIndexRef.current = currentRoundIndex;
+  }, [showInstructions, currentRoundIndex]);
+
+  const finalizeRoundScores = () => {
+    const startScores = roundStartScoresRef.current;
+    const startIndex = roundStartIndexRef.current;
+    if (!startScores || startIndex === null) return;
+    if (roundBreakdowns[startIndex]) return;
+    const scores = teams.map(team => ({
+      teamId: team.id,
+      teamName: team.name,
+      points: team.score - (startScores[team.id] ?? 0),
+    }));
+    setRoundBreakdowns(prev => {
+      const next = [...prev];
+      next[startIndex] = { roundType: rounds[startIndex], scores };
+      return next;
+    });
+  };
+
   // Show instructions before starting each round
   if (showInstructions) {
     return <RoundInstructions roundType={currentRound} isHost={true} onStart={handleStartRound} onSkip={handleSkipRound} />;
@@ -162,14 +205,50 @@ export function GameController({
           
           <div
             className="text-5xl font-bold px-12 py-6 rounded-2xl mb-8 inline-block"
-            style={{ backgroundColor: winner.color }}
+            style={{ backgroundColor: isTie ? 'rgba(255, 255, 255, 0.15)' : winner.color }}
           >
-            🎉 {winner.name} Wins! 🎉
+            {isTie ? '🤝 It’s a tie!' : `🎉 ${winner.name} Wins! 🎉`}
           </div>
+          {isTie && (
+            <div className="text-xl text-blue-100 mb-6">
+              Tied teams: {topTeams.map(team => team.name).join(', ')}
+            </div>
+          )}
 
           <div className="mb-12">
             <Scoreboard teams={teams} />
           </div>
+
+          {roundBreakdowns.length > 0 && (
+            <div className="mb-10 text-left max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-4 text-center">Round Breakdown</h2>
+              <div className="space-y-4">
+                {roundBreakdowns.map((round, index) => (
+                  <div
+                    key={`${round.roundType}-${index}`}
+                    className="bg-white/10 border border-white/20 rounded-xl p-4"
+                  >
+                    <div className="text-white font-bold mb-3">
+                      Round {index + 1}: {ROUND_NAMES[round.roundType]}
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {round.scores.map(score => (
+                        <div
+                          key={score.teamId}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg"
+                        >
+                          <span className="text-white">{score.teamName}</span>
+                          <span className="text-blue-100 font-semibold">
+                            {score.points >= 0 ? `+${score.points}` : score.points}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-4 justify-center">
             <Button onClick={onReset} size="lg" className="bg-white text-purple-900 hover:bg-gray-100">

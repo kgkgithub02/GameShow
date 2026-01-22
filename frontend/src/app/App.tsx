@@ -78,17 +78,32 @@ export default function App() {
     rounds: RoundType[],
     settings: RoundSettings
   ) => {
+    const manualPlayerCount = newTeams.reduce(
+      (sum, team) => sum + team.players.filter(name => name.trim()).length,
+      0
+    );
+    const computedPlayerCount =
+      setupMode === 'manual'
+        ? manualPlayerCount
+        : joinedPlayers.length > 0
+          ? joinedPlayers.length
+          : newTeams.length;
+    const settingsWithCounts: RoundSettings = {
+      ...settings,
+      blindDrawWordCount: computedPlayerCount > 0 ? computedPlayerCount * 2 : settings.blindDrawWordCount,
+    };
+
     setTeams(newTeams);
     setDifficulty(newDifficulty);
     setSelectedRounds(rounds);
-    setRoundSettings(settings);
+    setRoundSettings(settingsWithCounts);
 
     if (setupMode === 'online' && gameId) {
       updateGameState(gameId, {
         round_data: {
           game_setup: {
             rounds,
-            round_settings: settings,
+            round_settings: settingsWithCounts,
             difficulty: newDifficulty,
           },
         },
@@ -97,7 +112,7 @@ export default function App() {
 
     setLoadingQuestions(true);
     try {
-      const questions = await generateQuestions({ rounds, roundSettings: settings });
+      const questions = await generateQuestions({ rounds, roundSettings: settingsWithCounts });
       setGeneratedQuestions(questions);
       setSetupStep('review');
       if (setupMode === 'online' && gameId) {
@@ -106,7 +121,7 @@ export default function App() {
             generated_questions: questions,
             game_setup: {
               rounds,
-              round_settings: settings,
+              round_settings: settingsWithCounts,
               difficulty: newDifficulty,
               setup_step: 'review',
             },
@@ -164,6 +179,14 @@ export default function App() {
     setHostEntry('menu');
   };
 
+  const handleLocalScoreUpdate = (teamId: string, points: number) => {
+    setTeams(prev =>
+      prev.map(team =>
+        team.id === teamId ? { ...team, score: team.score + points } : team
+      )
+    );
+  };
+
   useEffect(() => {
     if (!gameId || setupMode !== 'online') return;
     updateGameState(gameId, {
@@ -178,18 +201,25 @@ export default function App() {
   // Mode selection screen
   if (mode === 'select') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 flex items-center justify-center p-4 sm:p-6">
         <div className="max-w-4xl w-full">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-12"
           >
-            <h1 className="text-6xl font-bold text-white mb-4">🎮 Game Show</h1>
+            <h1 className="text-4xl sm:text-6xl font-bold text-white mb-4 flex items-center justify-center gap-3 whitespace-nowrap">
+              <img
+                src="/favicon.svg"
+                alt="Teams icon"
+                className="h-8 w-8 sm:h-12 sm:w-12"
+              />
+              <span>Game Show</span>
+            </h1>
             <p className="text-2xl text-blue-100">Choose your mode</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <motion.button
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -200,17 +230,17 @@ export default function App() {
                 setMode('host');
                 setHostEntry('menu');
               }}
-              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all group"
+              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-5 sm:p-8 hover:bg-white/20 transition-all group"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-blue-500/30 transition-colors">
-                  <Monitor className="h-12 w-12 text-white" />
+                <div className="w-16 h-16 sm:w-24 sm:h-24 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-blue-500/30 transition-colors">
+                  <Monitor className="h-8 w-8 sm:h-12 sm:w-12 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-3">Host Mode</h2>
-                <p className="text-blue-100 mb-4">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-3">Host Mode</h2>
+                <p className="text-blue-100 mb-3 sm:mb-4 text-sm sm:text-base">
                   Control the game, manage rounds, and display questions on the main screen
                 </p>
-                <div className="text-sm text-blue-200 bg-blue-500/20 px-4 py-2 rounded-full">
+                <div className="text-xs sm:text-sm text-blue-200 bg-blue-500/20 px-3 py-2 rounded-full">
                   For game host / presenter
                 </div>
               </div>
@@ -223,17 +253,17 @@ export default function App() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setMode('player')}
-              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all group"
+              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-5 sm:p-8 hover:bg-white/20 transition-all group"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-green-500/30 transition-colors">
-                  <Users className="h-12 w-12 text-white" />
+                <div className="w-16 h-16 sm:w-24 sm:h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-green-500/30 transition-colors">
+                  <Users className="h-8 w-8 sm:h-12 sm:w-12 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold text-white mb-3">Player Mode</h2>
-                <p className="text-blue-100 mb-4">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-3">Player Mode</h2>
+                <p className="text-blue-100 mb-3 sm:mb-4 text-sm sm:text-base">
                   Join a game with a code, see questions, and buzz in to answer
                 </p>
-                <div className="text-sm text-blue-200 bg-green-500/20 px-4 py-2 rounded-full">
+                <div className="text-xs sm:text-sm text-blue-200 bg-green-500/20 px-3 py-2 rounded-full">
                   For game participants
                 </div>
               </div>
@@ -263,17 +293,17 @@ export default function App() {
   // Host mode
   if (mode === 'host' && hostEntry === 'menu') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 flex items-center justify-center p-4 sm:p-6">
         <div className="max-w-4xl w-full">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-6 sm:mb-12"
           >
-            <h1 className="text-5xl font-bold text-white mb-4">Host Mode</h1>
-            <p className="text-xl text-blue-100">Start a new game or rejoin with a code</p>
+            <h1 className="text-3xl sm:text-5xl font-bold text-white mb-3">Host Mode</h1>
+            <p className="text-base sm:text-xl text-blue-100">Start a new game or rejoin with a code</p>
           </motion.div>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <motion.button
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -281,14 +311,14 @@ export default function App() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setHostEntry('new')}
-              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all group"
+              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-5 sm:p-8 hover:bg-white/20 transition-all group"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-blue-500/30 transition-colors">
-                  <Monitor className="h-10 w-10 text-white" />
+                <div className="w-14 h-14 sm:w-20 sm:h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-blue-500/30 transition-colors">
+                  <Monitor className="h-7 w-7 sm:h-10 sm:w-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-3">Start New Game</h2>
-                <p className="text-blue-100">
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Start New Game</h2>
+                <p className="text-blue-100 text-sm sm:text-base">
                   Create a new game and generate a code for players to join
                 </p>
               </div>
@@ -301,14 +331,14 @@ export default function App() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setHostEntry('join')}
-              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all group"
+              className="bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl p-5 sm:p-8 hover:bg-white/20 transition-all group"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-green-500/30 transition-colors">
-                  <Users className="h-10 w-10 text-white" />
+                <div className="w-14 h-14 sm:w-20 sm:h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-green-500/30 transition-colors">
+                  <Users className="h-7 w-7 sm:h-10 sm:w-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-3">Rejoin Host</h2>
-                <p className="text-blue-100">
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Rejoin Host</h2>
+                <p className="text-blue-100 text-sm sm:text-base">
                   Resume hosting a live game by entering the game code
                 </p>
               </div>
@@ -447,6 +477,7 @@ export default function App() {
       gameId={gameId}
       gameCode={gameCode}
       onReset={handleReset}
+      onUpdateLocalScore={handleLocalScoreUpdate}
     />
   );
 }

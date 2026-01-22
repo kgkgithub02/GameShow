@@ -434,7 +434,7 @@ export function GameSetup({
                       <SelectContent>
                         <SelectItem value="easy">Easy</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="medium-hard">Medium-Hard (Default)</SelectItem>
+                        <SelectItem value="medium-hard">Mid-Hard (Default)</SelectItem>
                         <SelectItem value="hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>
@@ -501,7 +501,7 @@ export function GameSetup({
                       <SelectContent>
                         <SelectItem value="easy">Easy</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="medium-hard">Medium-Hard (Default)</SelectItem>
+                        <SelectItem value="medium-hard">Mid-Hard (Default)</SelectItem>
                         <SelectItem value="hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>
@@ -578,7 +578,7 @@ export function GameSetup({
                 <div className="ml-8 pt-2 border-t space-y-3">
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Question Themes (one per column)</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[0, 1, 2, 3].map((colIndex) => (
                         <div key={colIndex}>
                           <Label htmlFor={`connect4-theme-${colIndex}`} className="text-xs text-gray-600">
@@ -641,7 +641,7 @@ export function GameSetup({
                       <SelectContent>
                         <SelectItem value="easy">Easy</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="medium-hard">Medium-Hard (Default)</SelectItem>
+                        <SelectItem value="medium-hard">Mid-Hard (Default)</SelectItem>
                         <SelectItem value="hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>
@@ -730,7 +730,7 @@ export function GameSetup({
                       <SelectContent>
                         <SelectItem value="easy">Easy</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="medium-hard">Medium-Hard (Default)</SelectItem>
+                        <SelectItem value="medium-hard">Mid-Hard (Default)</SelectItem>
                         <SelectItem value="hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>

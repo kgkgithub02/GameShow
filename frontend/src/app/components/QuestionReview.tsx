@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GeneratedQuestions } from '@/app/utils/questionGenerator';
-import { RoundType, RoundSettings } from '@/app/types/game';
+import { Difficulty, RoundType, RoundSettings } from '@/app/types/game';
 import { RefreshCw, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { regenerateQuestion } from '@/services/questionService';
 import { formatGameCode } from '@/app/utils/gameCode';
 import { useGameSync } from '@/hooks/useGameSync';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 
 interface QuestionReviewProps {
   questions: GeneratedQuestions;
@@ -57,7 +58,7 @@ export function QuestionReview({
     setExpandedRounds(newExpanded);
   };
 
-  const handleRegenerate = async (roundType: RoundType, index: number) => {
+  const handleRegenerate = async (roundType: RoundType, index: number, difficultyOverride?: Difficulty) => {
     setRegeneratingIndex({ round: roundType, index });
 
     try {
@@ -65,7 +66,7 @@ export function QuestionReview({
         const current = questions.triviaBuzz[index];
         const response = await regenerateQuestion({
           round_type: roundType,
-          difficulty: current.difficulty,
+          difficulty: difficultyOverride || current.difficulty,
           category: current.category || null,
         });
         if (response.question) {
@@ -80,7 +81,7 @@ export function QuestionReview({
         const current = questions.lightning[index];
         const response = await regenerateQuestion({
           round_type: roundType,
-          difficulty: current.difficulty,
+          difficulty: difficultyOverride || current.difficulty,
           category: current.category || null,
         });
         if (response.question) {
@@ -105,7 +106,7 @@ export function QuestionReview({
         const current = questions.connect4[index];
         const response = await regenerateQuestion({
           round_type: roundType,
-          difficulty: current.question.difficulty,
+          difficulty: difficultyOverride || current.question.difficulty,
           category: current.question.category || null,
           column: current.column,
           row: current.row,
@@ -265,7 +266,21 @@ export function QuestionReview({
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <span className="font-semibold text-sm text-gray-600">Q{index + 1}</span>
-                                <span className="text-xs px-2 py-1 bg-gray-100 rounded">{q.difficulty}</span>
+                                <Select
+                                  value={q.difficulty}
+                                  onValueChange={(value) => handleRegenerate('trivia-buzz', index, value as Difficulty)}
+                                  disabled={regeneratingIndex !== null}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="easy">Easy</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="medium-hard">Mid-Hard</SelectItem>
+                                    <SelectItem value="hard">Hard</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <p className="font-medium mb-1">{q.text}</p>
                               <p className="text-sm text-green-600">✓ Answer: {q.answer}</p>
@@ -327,7 +342,21 @@ export function QuestionReview({
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <span className="font-semibold text-sm text-gray-600">Q{index + 1}</span>
-                                <span className="text-xs px-2 py-1 bg-gray-100 rounded">{q.difficulty}</span>
+                                <Select
+                                  value={q.difficulty}
+                                  onValueChange={(value) => handleRegenerate('lightning', index, value as Difficulty)}
+                                  disabled={regeneratingIndex !== null}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="easy">Easy</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="medium-hard">Mid-Hard</SelectItem>
+                                    <SelectItem value="hard">Hard</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <p className="font-medium mb-1">{q.text}</p>
                               <p className="text-sm text-green-600">✓ Answer: {q.answer}</p>
@@ -457,7 +486,21 @@ export function QuestionReview({
                                     Column {item.column + 1} ({columnTheme}), {rowLabel}
                                   </span>
                                   <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-semibold">{rowPoints} pts</span>
-                                  <span className="text-xs px-2 py-1 bg-gray-100 rounded">{item.question.difficulty}</span>
+                                <Select
+                                  value={item.question.difficulty}
+                                  onValueChange={(value) => handleRegenerate('connect-4', index, value as Difficulty)}
+                                  disabled={regeneratingIndex !== null}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="easy">Easy</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="medium-hard">Mid-Hard</SelectItem>
+                                    <SelectItem value="hard">Hard</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 </div>
                                 <p className="font-medium mb-1">{item.question.text}</p>
                                 <p className="text-sm text-green-600">✓ Answer: {item.question.answer}</p>
@@ -571,7 +614,7 @@ export function QuestionReview({
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-60"
             >
               <Check className="h-5 w-5 mr-2" />
-              Confirm & Start Game
+              Start Game
             </Button>
             {!effectiveCanStart && effectiveDisabledMessage && (
               <p className="text-xs text-blue-200 text-center">{effectiveDisabledMessage}</p>

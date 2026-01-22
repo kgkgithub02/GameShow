@@ -27,7 +27,13 @@ export function PlayerLightning({
   roundComplete = false,
   pointsThisRound,
 }: PlayerLightningProps) {
-  const isComplete = roundComplete || timeRemaining === 0 || !question;
+  const isComplete =
+    roundComplete || timeRemaining === 0 || (!question && questionNumber >= totalQuestions);
+  const showQuestionProgress = question && questionNumber > 0;
+  const questionProgressText = showQuestionProgress
+    ? `${questionNumber}/${totalQuestions}`
+    : `${totalQuestions}`;
+
   return (
     <div className="space-y-4">
       {/* Timer and Progress */}
@@ -45,10 +51,10 @@ export function PlayerLightning({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-white">
-                  {questionNumber}/{totalQuestions}
-                </div>
-                <div className="text-sm text-blue-200">Questions</div>
+              <div className="text-3xl font-bold text-white">
+                {questionProgressText}
+              </div>
+              <div className="text-sm text-blue-200">Questions</div>
               </div>
             </div>
 

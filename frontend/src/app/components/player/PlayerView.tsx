@@ -160,8 +160,8 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
         return (
           <PlayerLightning
             question={roundData.lightning?.question || null}
-            questionNumber={roundData.lightning?.question_number || 1}
-            totalQuestions={roundData.lightning?.total_questions || 20}
+            questionNumber={roundData.lightning?.question_number ?? 0}
+            totalQuestions={roundData.lightning?.total_questions || 10}
             timeRemaining={roundData.lightning?.time_remaining ?? 60}
             yourTurn={yourTurn}
             teamColor={teamColor}
@@ -394,8 +394,8 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
       <div className="bg-black/20 backdrop-blur-sm border-b border-white/20 p-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div>
-            <div className="text-xs text-blue-200">Game Code</div>
-            <div className="text-lg font-bold text-white tracking-wider">{formatGameCode(gameCode)}</div>
+            <div className="text-xs text-blue-200">Team</div>
+            <div className="text-lg font-bold text-white">{teamName}</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-blue-200">Round {roundNumber}</div>
@@ -405,20 +405,6 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
             <div className="text-xs text-blue-200">Player</div>
             <div className="text-lg font-bold text-white">{playerName}</div>
           </div>
-        </div>
-      </div>
-
-      {/* Team Badge */}
-      <div className="p-4">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
-            style={{ backgroundColor: teamColor }}
-            whileHover={{ scale: 1.05 }}
-          >
-            <div className="w-3 h-3 bg-white rounded-full" />
-            <span className="text-white font-bold">{teamName}</span>
-          </motion.div>
         </div>
       </div>
 
@@ -538,6 +524,8 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
 
         </div>
       </div>
+
+      
     </div>
   );
 }

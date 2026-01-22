@@ -97,6 +97,7 @@ export interface RoundSettings {
   guessNumberQuestions?: number;
   guessNumberDifficulty?: Difficulty;
   blindDrawSeconds?: number;
+  blindDrawWordCount?: number;
   connect4Themes?: [
     'general' | 'science' | 'history' | 'pop-culture' | 'sports' | 'geography',
     'general' | 'science' | 'history' | 'pop-culture' | 'sports' | 'geography',

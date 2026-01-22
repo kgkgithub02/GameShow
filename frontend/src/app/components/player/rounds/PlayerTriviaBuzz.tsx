@@ -52,8 +52,10 @@ export function PlayerTriviaBuzz({
     }
   };
 
+  const showBuzzButton = canBuzz && !buzzedTeam;
+
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${showBuzzButton ? 'pb-28 sm:pb-0' : ''}`}>
       {/* Question Card */}
       {question && (
         <Card className="bg-white/10 backdrop-blur-xl border-white/20">
@@ -115,33 +117,36 @@ export function PlayerTriviaBuzz({
       </AnimatePresence>
 
       {/* Buzz Button */}
-      {canBuzz && !buzzedTeam && (
+      {showBuzzButton && (
         <motion.div
           whileHover={{ scale: canBuzz && !buzzed ? 1.02 : 1 }}
           whileTap={{ scale: canBuzz && !buzzed ? 0.98 : 1 }}
+          className="fixed bottom-0 left-0 right-0 z-20 sm:static"
         >
-          <Button
-            onClick={handleBuzz}
-            disabled={!canBuzz || buzzed}
-            size="lg"
-            className="w-full h-20 text-2xl font-bold"
-            style={{
-              backgroundColor: buzzed ? '#10B981' : teamColor,
-              opacity: buzzed ? 0.7 : 1,
-            }}
-          >
-            {buzzed ? (
-              <>
-                <Trophy className="mr-3 h-8 w-8" />
-                Buzzed In!
-              </>
-            ) : (
-              <>
-                <Zap className="mr-3 h-8 w-8" />
-                BUZZ IN!
-              </>
-            )}
-          </Button>
+          <div className="px-4 pb-4 pt-3 sm:px-0 sm:pb-0 sm:pt-0 bg-gradient-to-t from-indigo-900/95 via-indigo-900/80 to-transparent sm:bg-transparent">
+            <Button
+              onClick={handleBuzz}
+              disabled={!canBuzz || buzzed}
+              size="lg"
+              className="w-full h-20 text-2xl font-bold"
+              style={{
+                backgroundColor: buzzed ? '#10B981' : teamColor,
+                opacity: buzzed ? 0.7 : 1,
+              }}
+            >
+              {buzzed ? (
+                <>
+                  <Trophy className="mr-3 h-8 w-8" />
+                  Buzzed In!
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-3 h-8 w-8" />
+                  BUZZ IN!
+                </>
+              )}
+            </Button>
+          </div>
         </motion.div>
       )}
 

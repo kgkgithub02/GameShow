@@ -150,6 +150,7 @@ class RoundSettingsIn(BaseModel):
     connect4_difficulty: Difficulty | None = Field(default=None, alias="connect4Difficulty")
     blind_draw_seconds: int | None = Field(default=None, alias="blindDrawSeconds")
     blind_draw_difficulty: Difficulty | None = Field(default=None, alias="blindDrawDifficulty")
+    blind_draw_word_count: int | None = Field(default=None, alias="blindDrawWordCount")
 
 
 class QuestionOut(BaseModel):

@@ -285,7 +285,7 @@ async def generate_questions(payload: schemas.GenerateQuestionsRequest) -> schem
         generated.connect4 = [connect4_map[(col, row)] for col in range(4) for row in range(4)]
 
     if "blind-draw" in rounds:
-        count = 5
+        count = settings.blind_draw_word_count or 5
         difficulty = settings.blind_draw_difficulty or "medium-hard"
         prompt = (
             "Generate drawing prompt words as JSON with this schema: "
