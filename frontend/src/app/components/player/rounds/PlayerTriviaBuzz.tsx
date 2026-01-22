@@ -1,0 +1,167 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent } from '@/app/components/ui/card';
+import { Button } from '@/app/components/ui/button';
+import { Zap, Trophy, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface PlayerTriviaBuzzProps {
+  question: string | null;
+  category?: string;
+  points?: number;
+  canBuzz: boolean;
+  buzzedTeam: string | null;
+  buzzedPlayerName?: string | null;
+  teamId: string;
+  teamColor: string;
+  timeRemaining?: number;
+  answer?: string;
+  showAnswer?: boolean;
+  onBuzz?: () => Promise<void> | void;
+}
+
+export function PlayerTriviaBuzz({
+  question,
+  category,
+  points,
+  canBuzz,
+  buzzedTeam,
+  buzzedPlayerName,
+  teamId,
+  teamColor,
+  timeRemaining,
+  answer,
+  showAnswer,
+  onBuzz,
+}: PlayerTriviaBuzzProps) {
+  const [buzzed, setBuzzed] = useState(false);
+
+  useEffect(() => {
+    // Reset local buzz state for a new question or when buzzing re-opens
+    if (question || canBuzz) {
+      if (!buzzedTeam) {
+        setBuzzed(false);
+      }
+    }
+  }, [question, canBuzz, buzzedTeam]);
+
+  const handleBuzz = async () => {
+    if (!canBuzz || buzzed) return;
+    setBuzzed(true);
+    if (onBuzz) {
+      await onBuzz();
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Question Card */}
+      {question && (
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20">
+          <CardContent className="pt-6">
+            {category && (
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-blue-300 uppercase font-bold">
+                  {category}
+                </div>
+                {points && (
+                  <div className="flex items-center gap-2 text-yellow-400 font-bold">
+                    <Trophy className="h-4 w-4" />
+                    {points} pts
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="text-2xl text-white font-medium leading-relaxed">
+              {question}
+            </div>
+            {timeRemaining !== undefined && (
+              <div className="mt-4 flex items-center justify-center">
+                <div className="flex items-center gap-3 rounded-full bg-blue-500/20 px-5 py-2 border border-blue-400/40">
+                  <Clock className="h-5 w-5 text-blue-200" />
+                  <span className="text-2xl font-bold text-white">
+                    {timeRemaining}s
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Buzz Status */}
+      <AnimatePresence>
+        {buzzedTeam && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+          >
+            <Card className="bg-yellow-500/20 backdrop-blur-xl border-yellow-500/50">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Zap className="h-5 w-5 text-yellow-400" />
+                  <p className="text-white font-bold">
+                    {buzzedPlayerName
+                      ? `${buzzedPlayerName} buzzed in!`
+                      : buzzedTeam === teamId
+                      ? 'You buzzed in!'
+                      : 'Other team buzzed in!'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Buzz Button */}
+      {canBuzz && !buzzedTeam && (
+        <motion.div
+          whileHover={{ scale: canBuzz && !buzzed ? 1.02 : 1 }}
+          whileTap={{ scale: canBuzz && !buzzed ? 0.98 : 1 }}
+        >
+          <Button
+            onClick={handleBuzz}
+            disabled={!canBuzz || buzzed}
+            size="lg"
+            className="w-full h-20 text-2xl font-bold"
+            style={{
+              backgroundColor: buzzed ? '#10B981' : teamColor,
+              opacity: buzzed ? 0.7 : 1,
+            }}
+          >
+            {buzzed ? (
+              <>
+                <Trophy className="mr-3 h-8 w-8" />
+                Buzzed In!
+              </>
+            ) : (
+              <>
+                <Zap className="mr-3 h-8 w-8" />
+                BUZZ IN!
+              </>
+            )}
+          </Button>
+        </motion.div>
+      )}
+
+      {!buzzed && canBuzz && !buzzedTeam && (
+        <p className="text-center text-blue-200 text-sm">
+          Tap to buzz in when you know the answer
+        </p>
+      )}
+
+      {/* Answer Display */}
+      {showAnswer && answer && (
+        <Card className="bg-green-500/20 backdrop-blur-xl border-green-500/50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-center gap-2">
+              <Trophy className="h-5 w-5 text-green-400" />
+              <p className="text-white font-bold">Answer: {answer}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
