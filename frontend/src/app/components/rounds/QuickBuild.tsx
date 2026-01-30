@@ -142,14 +142,14 @@ export function QuickBuild({ teams, onUpdateScore, onComplete, gameId, durationS
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">🏗️ Quick Build</h2>
-        <p className="text-blue-200">{getCriteriaDescription()}</p>
-        <p className="text-blue-200/70 text-sm mt-1">Teams have {roundSeconds} seconds to build</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">🏗️ Quick Build</h2>
+        <p className="text-blue-200 text-sm sm:text-base">{getCriteriaDescription()}</p>
+        <p className="text-blue-200/70 text-xs sm:text-sm mt-1">Teams have {roundSeconds} seconds to build</p>
       </div>
 
-      {!state.isActive && !winner && !tie && (
+      {!state.isActive && !winner && !tie && !roundStarted && (
         <div className="max-w-2xl mx-auto space-y-6">
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
             <CardContent className="pt-6">

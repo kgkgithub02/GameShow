@@ -11,12 +11,13 @@ interface PlayerTriviaBuzzProps {
   canBuzz: boolean;
   buzzedTeam: string | null;
   buzzedPlayerName?: string | null;
+  incorrectTeamId?: string | null;
   teamId: string;
   teamColor: string;
   timeRemaining?: number;
   answer?: string;
   showAnswer?: boolean;
-  onBuzz?: () => Promise<void> | void;
+  onBuzz?: () => Promise<boolean> | boolean;
 }
 
 export function PlayerTriviaBuzz({
@@ -26,6 +27,7 @@ export function PlayerTriviaBuzz({
   canBuzz,
   buzzedTeam,
   buzzedPlayerName,
+  incorrectTeamId,
   teamId,
   teamColor,
   timeRemaining,
@@ -34,25 +36,36 @@ export function PlayerTriviaBuzz({
   onBuzz,
 }: PlayerTriviaBuzzProps) {
   const [buzzed, setBuzzed] = useState(false);
+  const [buzzSubmitting, setBuzzSubmitting] = useState(false);
+  const [buzzRejected, setBuzzRejected] = useState(false);
 
   useEffect(() => {
     // Reset local buzz state for a new question or when buzzing re-opens
-    if (question || canBuzz) {
-      if (!buzzedTeam) {
-        setBuzzed(false);
-      }
+    if (!buzzedTeam || (canBuzz && buzzedTeam !== teamId)) {
+      setBuzzed(false);
     }
-  }, [question, canBuzz, buzzedTeam]);
+  }, [question, canBuzz, buzzedTeam, teamId]);
 
   const handleBuzz = async () => {
-    if (!canBuzz || buzzed) return;
-    setBuzzed(true);
-    if (onBuzz) {
-      await onBuzz();
+    if (!canAttemptBuzz || buzzed || buzzSubmitting) return;
+    if (!onBuzz) return;
+    setBuzzSubmitting(true);
+    setBuzzRejected(false);
+    try {
+      const accepted = await onBuzz();
+      if (accepted) {
+        setBuzzed(true);
+      } else {
+        setBuzzRejected(true);
+        setTimeout(() => setBuzzRejected(false), 1500);
+      }
+    } finally {
+      setBuzzSubmitting(false);
     }
   };
 
-  const showBuzzButton = canBuzz && !buzzedTeam;
+  const canAttemptBuzz = canBuzz && (!incorrectTeamId || incorrectTeamId !== teamId);
+  const showBuzzButton = canAttemptBuzz && (buzzedTeam !== teamId || !buzzedTeam);
 
   return (
     <div className={`space-y-4 ${showBuzzButton ? 'pb-28 sm:pb-0' : ''}`}>
@@ -119,14 +132,14 @@ export function PlayerTriviaBuzz({
       {/* Buzz Button */}
       {showBuzzButton && (
         <motion.div
-          whileHover={{ scale: canBuzz && !buzzed ? 1.02 : 1 }}
-          whileTap={{ scale: canBuzz && !buzzed ? 0.98 : 1 }}
+          whileHover={{ scale: canBuzz && !buzzed && !buzzSubmitting ? 1.02 : 1 }}
+          whileTap={{ scale: canBuzz && !buzzed && !buzzSubmitting ? 0.98 : 1 }}
           className="fixed bottom-0 left-0 right-0 z-20 sm:static"
         >
           <div className="px-4 pb-4 pt-3 sm:px-0 sm:pb-0 sm:pt-0 bg-gradient-to-t from-indigo-900/95 via-indigo-900/80 to-transparent sm:bg-transparent">
             <Button
               onClick={handleBuzz}
-              disabled={!canBuzz || buzzed}
+              disabled={!canBuzz || buzzed || buzzSubmitting}
               size="lg"
               className="w-full h-20 text-2xl font-bold"
               style={{
@@ -150,9 +163,39 @@ export function PlayerTriviaBuzz({
         </motion.div>
       )}
 
-      {!buzzed && canBuzz && !buzzedTeam && (
+      {incorrectTeamId && !showAnswer && (
+        <p className="text-center text-yellow-300 text-sm font-medium">
+          {incorrectTeamId === teamId
+            ? 'Incorrect! Opponents can steal.'
+            : 'Steal opportunity! Buzz in now.'}
+        </p>
+      )}
+      {showAnswer && buzzedTeam && incorrectTeamId === buzzedTeam && (
+        <p className="text-center text-red-300 text-sm font-medium">
+          {buzzedPlayerName
+            ? `${buzzedPlayerName} answered incorrectly.`
+            : buzzedTeam === teamId
+            ? 'Your team answered incorrectly.'
+            : 'Other team answered incorrectly.'}
+        </p>
+      )}
+      {showAnswer && buzzedTeam && incorrectTeamId !== buzzedTeam && (
+        <p className="text-center text-green-300 text-sm font-medium">
+          {buzzedPlayerName
+            ? `${buzzedPlayerName} answered correctly!`
+            : buzzedTeam === teamId
+            ? 'Your team answered correctly!'
+            : 'Other team answered correctly!'}
+        </p>
+      )}
+      {!buzzed && canAttemptBuzz && !buzzedTeam && !incorrectTeamId && (
         <p className="text-center text-blue-200 text-sm">
           Tap to buzz in when you know the answer
+        </p>
+      )}
+      {buzzRejected && (
+        <p className="text-center text-red-300 text-sm font-medium">
+          Too late!
         </p>
       )}
 

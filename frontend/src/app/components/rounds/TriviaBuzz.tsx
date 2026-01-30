@@ -40,10 +40,11 @@ export function TriviaBuzz({
   const [incorrectTeam, setIncorrectTeam] = useState<string | null>(null);
   const totalQuestions = questions && questions.length ? questions.length : 10;
 
-  const loadNextQuestion = () => {
+  const loadNextQuestion = (indexOverride?: number) => {
+    const nextIndex = indexOverride ?? questionsAsked;
     const nextQuestion =
-      questions && questions.length > questionsAsked
-        ? questions[questionsAsked]
+      questions && questions.length > nextIndex
+        ? questions[nextIndex]
         : getRandomQuestion(triviaQuestions, difficulty);
     setState({
       currentQuestion: nextQuestion,
@@ -63,6 +64,7 @@ export function TriviaBuzz({
           show_answer: false,
           buzzed_player_id: null,
           buzzed_player_name: null,
+          incorrect_team_id: null,
         },
       };
       updateGameState(gameId, {
@@ -93,6 +95,7 @@ export function TriviaBuzz({
           ...(gameState?.round_data as any)?.trivia,
           buzzed_player_id: null,
           buzzed_player_name: null,
+          incorrect_team_id: null,
         },
       };
       updateGameState(gameId, {
@@ -118,7 +121,11 @@ export function TriviaBuzz({
     if (gameId) {
       const roundData = {
         ...(gameState?.round_data || {}),
-        trivia: { answer: state.currentQuestion?.answer, show_answer: true },
+        trivia: {
+          answer: state.currentQuestion?.answer,
+          show_answer: true,
+          incorrect_team_id: null,
+        },
       };
       updateGameState(gameId, {
         can_buzz: false,
@@ -143,16 +150,25 @@ export function TriviaBuzz({
       answerTimer: null,
     }));
     if (gameId) {
+      const roundData = {
+        ...(gameState?.round_data || {}),
+        trivia: {
+          ...(gameState?.round_data as any)?.trivia,
+          incorrect_team_id: state.buzzedTeam,
+        },
+      };
       updateGameState(gameId, {
         can_buzz: true,
         buzzed_team_id: null,
         time_remaining: null,
+        round_data: roundData,
       }).catch(() => undefined);
     }
   };
 
   const handleSteal = (teamId: string) => {
     if (!state.stealAvailable) return;
+    if (!incorrectTeam || teamId === incorrectTeam) return;
     
     setState(prev => ({
       ...prev,
@@ -161,10 +177,19 @@ export function TriviaBuzz({
       answerTimer: 5,
     }));
     if (gameId) {
+      const roundData = {
+        ...(gameState?.round_data || {}),
+        trivia: {
+          ...(gameState?.round_data as any)?.trivia,
+          incorrect_team_id: null,
+          show_answer: false,
+        },
+      };
       updateGameState(gameId, {
         can_buzz: false,
         buzzed_team_id: teamId,
         time_remaining: 5,
+        round_data: roundData,
       }).catch(() => undefined);
     }
   };
@@ -183,7 +208,11 @@ export function TriviaBuzz({
     if (gameId) {
       const roundData = {
         ...(gameState?.round_data || {}),
-        trivia: { answer: state.currentQuestion?.answer, show_answer: true },
+        trivia: {
+          answer: state.currentQuestion?.answer,
+          show_answer: true,
+          incorrect_team_id: null,
+        },
       };
       updateGameState(gameId, {
         can_buzz: false,
@@ -209,7 +238,11 @@ export function TriviaBuzz({
     if (gameId) {
       const roundData = {
         ...(gameState?.round_data || {}),
-        trivia: { answer: state.currentQuestion?.answer, show_answer: true },
+        trivia: {
+          answer: state.currentQuestion?.answer,
+          show_answer: true,
+          incorrect_team_id: state.buzzedTeam,
+        },
       };
       updateGameState(gameId, {
         can_buzz: false,
@@ -220,25 +253,9 @@ export function TriviaBuzz({
   };
 
   const handleSkip = () => {
-    setShowAnswer(true);
-    setState(prev => ({
-      ...prev,
-      questionActive: false,
-      stealAvailable: false,
-      answerTimer: null,
-    }));
-    setQuestionsAsked(prev => prev + 1);
-    if (gameId) {
-      const roundData = {
-        ...(gameState?.round_data || {}),
-        trivia: { answer: state.currentQuestion?.answer, show_answer: true },
-      };
-      updateGameState(gameId, {
-        can_buzz: false,
-        time_remaining: null,
-        round_data: roundData,
-      }).catch(() => undefined);
-    }
+    const nextIndex = questionsAsked + 1;
+    setQuestionsAsked(nextIndex);
+    loadNextQuestion(nextIndex);
   };
 
   useEffect(() => {
@@ -312,10 +329,10 @@ export function TriviaBuzz({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">Trivia Buzz</h2>
-        <p className="text-blue-200">Question {questionsAsked + 1} of {totalQuestions}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Trivia Buzz</h2>
+        <p className="text-blue-200 text-sm sm:text-base">Question {questionsAsked + 1} of {totalQuestions}</p>
       </div>
 
       {state.currentQuestion && (
@@ -326,8 +343,8 @@ export function TriviaBuzz({
             </div>
 
             {/* Host Answer - Always Visible */}
-            <div className="bg-blue-500/20 border-2 border-blue-400 rounded-lg p-4 mb-6">
-              <p className="text-white text-center text-lg font-semibold">
+            <div className="bg-blue-500/20 border-2 border-blue-400 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+              <p className="text-white text-center text-base sm:text-lg font-semibold">
                 {state.currentQuestion.answer}
               </p>
             </div>
@@ -354,20 +371,32 @@ export function TriviaBuzz({
 
             {!state.buzzedTeam && !state.stealAvailable && state.questionActive && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  {teams.map(team => (
-                    <Button
-                      key={team.id}
-                      onClick={() => handleBuzz(team.id)}
-                      size="lg"
-                      style={{ backgroundColor: team.color }}
-                      className="h-20 text-xl"
-                    >
-                      <Zap className="mr-2 h-6 w-6" />
-                      {team.name} Buzz
-                    </Button>
-                  ))}
-                </div>
+                {gameId && (
+                  <p className="text-center text-blue-200 text-sm">
+                    Waiting for players to buzz
+                  </p>
+                )}
+                {!gameId && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {teams.map(team => (
+                      <Button
+                        key={team.id}
+                        onClick={() => handleBuzz(team.id)}
+                        size="lg"
+                        style={{ backgroundColor: team.color }}
+                        className="h-20 text-sm sm:text-xl"
+                      >
+                        <span className="flex flex-col items-center justify-center w-full leading-tight">
+                          <span className="text-center">{team.name}</span>
+                          <span className="flex items-center gap-1 text-[10px] sm:text-base uppercase tracking-wide">
+                            <Zap className="h-3.5 w-3.5 sm:h-5 sm:w-5 shrink-0" />
+                            Buzz
+                          </span>
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 <Button
                   onClick={handleSkip}
                   size="lg"
@@ -407,14 +436,21 @@ export function TriviaBuzz({
                 </p>
                 {!state.buzzedTeam && (
                   <div className="flex gap-4 justify-center">
-                    <Button
-                      onClick={() => handleSteal(stealTeam!.id)}
-                      size="lg"
-                      style={{ backgroundColor: stealTeam?.color }}
-                      className="h-16"
-                    >
-                      {stealTeam?.name} Steal
-                    </Button>
+                    {gameId && (
+                      <p className="text-center text-blue-200 text-sm self-center">
+                        Waiting for players to buzz
+                      </p>
+                    )}
+                    {!gameId && (
+                      <Button
+                        onClick={() => handleSteal(stealTeam!.id)}
+                        size="lg"
+                        style={{ backgroundColor: stealTeam?.color }}
+                        className="h-16"
+                      >
+                        {stealTeam?.name} Steal
+                      </Button>
+                    )}
                     <Button
                       onClick={handleSkip}
                       size="lg"

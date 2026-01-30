@@ -270,13 +270,13 @@ export function LightningRound({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">⚡ Lightning Round</h2>
-        <p className="text-blue-200">Answer as many questions as possible in {roundSeconds} seconds!</p>
-        <div className="mt-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">⚡ Lightning Round</h2>
+        <p className="text-blue-200 text-sm sm:text-base">Answer as many questions as possible in {roundSeconds} seconds!</p>
+        <div className="mt-3 sm:mt-4">
           <div
-            className="inline-block text-2xl font-bold px-6 py-3 rounded-full"
+            className="inline-block text-lg sm:text-2xl font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full"
             style={{ backgroundColor: currentTeam?.color }}
           >
             {currentTeam?.name}'s Turn
@@ -325,11 +325,11 @@ export function LightningRound({
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <div className="flex flex-row flex-wrap gap-3 sm:gap-4 justify-center">
                   <Button
                     onClick={handleCorrect}
                     size="lg"
-                    className="bg-green-600 hover:bg-green-700 text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 w-full sm:w-auto"
+                    className="bg-green-600 hover:bg-green-700 text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 basis-[calc(50%-0.375rem)] sm:basis-auto"
                   >
                     <Check className="mr-2 h-5 w-5 sm:h-6 sm:w-6" />
                     Correct
@@ -337,7 +337,7 @@ export function LightningRound({
                   <Button
                     onClick={handleIncorrect}
                     size="lg"
-                    className="bg-red-600 hover:bg-red-700 text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 w-full sm:w-auto"
+                    className="bg-red-600 hover:bg-red-700 text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 basis-[calc(50%-0.375rem)] sm:basis-auto"
                   >
                     <X className="mr-2 h-5 w-5 sm:h-6 sm:w-6" />
                     Wrong
@@ -346,7 +346,7 @@ export function LightningRound({
                     onClick={handlePass}
                     size="lg"
                     variant="outline"
-                    className="text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 w-full sm:w-auto"
+                    className="text-lg sm:text-xl h-14 sm:h-16 px-6 sm:px-8 basis-full sm:basis-auto"
                   >
                     <SkipForward className="mr-2 h-5 w-5 sm:h-6 sm:w-6" />
                     Pass

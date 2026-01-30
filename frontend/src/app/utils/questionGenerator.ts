@@ -1,5 +1,5 @@
 import { Question, Difficulty, RoundType, RoundSettings } from '@/app/types/game';
-import { triviaQuestions, lightningQuestions, guessNumberQuestions, blindDrawWords } from '@/app/data/questions';
+import { triviaQuestions, lightningQuestions, guessNumberQuestions, blindDrawWords, dumpCharadesWords } from '@/app/data/questions';
 
 export interface GeneratedQuestions {
   triviaBuzz?: Question[];
@@ -7,6 +7,7 @@ export interface GeneratedQuestions {
   guessNumber?: Array<{ question: string; answer: number }>;
   connect4?: Array<{ column: number; row: number; question: Question }>;
   blindDraw?: string[];
+  dumpCharades?: string[];
 }
 
 function getRandomFromArray<T>(arr: T[]): T {
@@ -92,6 +93,19 @@ export function generateAllQuestions(
     }
   }
 
+  // Dump Charades
+  if (rounds.includes('dump-charades')) {
+    const difficulty = roundSettings.dumpCharadesDifficulty || 'medium-hard';
+    const category = (roundSettings.dumpCharadesCategory || 'general').toLowerCase();
+    const poolByDifficulty = dumpCharadesWords[difficulty] || dumpCharadesWords['medium-hard'];
+    const pool = poolByDifficulty[category] || poolByDifficulty.general || dumpCharadesWords['medium-hard'].general || [];
+    const count = Math.max(roundSettings.blindDrawWordCount || 5, 1);
+    generated.dumpCharades = [];
+    for (let i = 0; i < count; i++) {
+      generated.dumpCharades.push(getRandomFromArray(pool));
+    }
+  }
+
   return generated;
 }
 
@@ -152,6 +166,16 @@ export function regenerateQuestion(
           ? blindDrawWords.hard
           : blindDrawWords.medium;
         updated.blindDraw[questionIndex] = getRandomFromArray(wordPool);
+      }
+      break;
+
+    case 'dump-charades':
+      if (updated.dumpCharades) {
+        const difficulty = roundSettings.dumpCharadesDifficulty || 'medium-hard';
+        const category = (roundSettings.dumpCharadesCategory || 'general').toLowerCase();
+        const poolByDifficulty = dumpCharadesWords[difficulty] || dumpCharadesWords['medium-hard'];
+        const pool = poolByDifficulty[category] || poolByDifficulty.general || dumpCharadesWords['medium-hard'].general || [];
+        updated.dumpCharades[questionIndex] = getRandomFromArray(pool);
       }
       break;
   }

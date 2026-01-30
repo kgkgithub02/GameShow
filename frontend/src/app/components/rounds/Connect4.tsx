@@ -42,6 +42,7 @@ export function Connect4({
   const [currentTeam, setCurrentTeam] = useState<string | null>(null);
   const [selectedColumn, setSelectedColumn] = useState<number | null>(null);
   const [showColumnChoice, setShowColumnChoice] = useState(false);
+  const [columnChoiceReason, setColumnChoiceReason] = useState<'steal-success' | 'steal-failed' | null>(null);
   const [stolenColumn, setStolenColumn] = useState<number | null>(null);
   const [board, setBoard] = useState<BoardCell[][]>(
     Array(4).fill(null).map(() =>
@@ -182,8 +183,7 @@ export function Connect4({
     checkForBonus(currentTeam, selectedCell.row, selectedCell.col, newBoard);
     
     // Increment questions answered in this column
-    const newCount = questionsAnsweredInColumn + 1;
-    setQuestionsAnsweredInColumn(newCount);
+    setQuestionsAnsweredInColumn(prev => prev + 1);
 
     // Check if board is complete
     const allAnswered = board.every(row => row.every(cell => cell.answered));
@@ -200,36 +200,14 @@ export function Connect4({
     setShowAnswer(false);
     
     if (columnComplete) {
-      // Column is complete
-      if (continuedWithStolenColumn || (originalTeamForColumn && currentTeam !== originalTeamForColumn)) {
-        // Team finished a stolen column - they get to pick a new category
-        setSelectedColumn(null);
-        setQuestionsAnsweredInColumn(0);
-        setOriginalTeamForColumn(currentTeam); // They are now the "original" team for the next category
-        setContinuedWithStolenColumn(false);
-        setIsStealScenario(false);
-        // Turn continues with current team
-      } else if (currentTeam === originalTeamForColumn) {
-        // Original team completed all 4 questions in their chosen column - switch turn
-        switchTurn();
-        setQuestionsAnsweredInColumn(0);
-        setOriginalTeamForColumn(null);
-        setIsStealScenario(false);
-      } else {
-        // If no original team tracked, default to switching turns
-        switchTurn();
-        setQuestionsAnsweredInColumn(0);
-        setOriginalTeamForColumn(null);
-        setIsStealScenario(false);
-      }
-    } else if (newCount >= 4) {
-      // Team answered 4 questions but column isn't complete (some were stolen by other team)
-      // Switch turn
+      // Column complete always passes turn to the other team
       switchTurn();
+      setSelectedColumn(null);
       setQuestionsAnsweredInColumn(0);
       setOriginalTeamForColumn(null);
       setIsStealScenario(false);
       setContinuedWithStolenColumn(false);
+      setColumnChoiceReason(null);
     }
     // Otherwise, continue with same team selecting next question in the same column
   };
@@ -287,7 +265,7 @@ export function Connect4({
     setShowAnswer(false);
     
     if (columnComplete) {
-      // Column is complete - automatically give them a new category choice
+      // Column is complete - stealing team picks a new column
       setSelectedColumn(null);
       setShowColumnChoice(false);
       setStolenColumn(null);
@@ -295,12 +273,14 @@ export function Connect4({
       setOriginalTeamForColumn(stealingTeam.id);
       setIsStealScenario(false);
       setContinuedWithStolenColumn(false);
+      setColumnChoiceReason(null);
     } else {
-      // Store the column they just stole from
-      setStolenColumn(selectedCell.col);
-      // Clear selected column and show them the choice
+      // Stealing team continues the turn and picks a new column (no choice screen)
       setSelectedColumn(null);
-      setShowColumnChoice(true);
+      setShowColumnChoice(false);
+      setStolenColumn(null);
+      setQuestionsAnsweredInColumn(0);
+      setColumnChoiceReason(null);
     }
   };
   
@@ -312,6 +292,7 @@ export function Connect4({
     setCurrentQuestion(null);
     setShowAnswer(false);
     setContinuedWithStolenColumn(true);
+    setColumnChoiceReason(null);
   };
   
   const handlePickNewColumn = () => {
@@ -321,6 +302,8 @@ export function Connect4({
     setSelectedCell(null);
     setCurrentQuestion(null);
     setShowAnswer(false);
+    setContinuedWithStolenColumn(false);
+    setColumnChoiceReason(null);
   };
   
   const handleStealIncorrect = () => {
@@ -341,18 +324,24 @@ export function Connect4({
     setSelectedCell(null);
     setCurrentQuestion(null);
     setShowAnswer(false);
-    
-    // Turn goes back to the original team that selected the category
-    if (originalTeamForColumn && originalTeamForColumn !== currentTeam) {
-      setCurrentTeam(originalTeamForColumn);
+
+    // After a failed steal, the next team gets to choose to stay or pick a new column
+    const nextTeamId = incorrectTeam || null;
+    if (nextTeamId) {
+      setCurrentTeam(nextTeamId);
       setSelectedColumn(null);
+      setShowColumnChoice(false);
+      setStolenColumn(null);
+      setColumnChoiceReason(null);
       setQuestionsAnsweredInColumn(0);
-      setOriginalTeamForColumn(null);
+      setOriginalTeamForColumn(nextTeamId);
       setIsStealScenario(false);
-    } else {
-      // If no original team tracked, just switch turn
-      switchTurn();
+      setContinuedWithStolenColumn(false);
+      return;
     }
+
+    // Fallback if we don't know the next team
+    switchTurn();
   };
 
   const handleBothFailed = () => {
@@ -546,10 +535,10 @@ export function Connect4({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">🎯 Connect 4 Trivia</h2>
-        <p className="text-blue-200 mb-4">Answer questions to claim squares!</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">🎯 Connect 4 Trivia</h2>
+        <p className="text-blue-200 text-sm sm:text-base mb-2 sm:mb-4">Answer questions to claim squares!</p>
         <div
           className="inline-block text-xl font-bold px-6 py-3 rounded-full"
           style={{ backgroundColor: currentTeamData?.color }}
@@ -569,7 +558,9 @@ export function Connect4({
             >
               <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-6">
                 <p className="text-white font-bold text-xl mb-4">
-                  🎉 Great steal, {currentTeamData?.name}!
+                  {columnChoiceReason === 'steal-failed'
+                    ? `${currentTeamData?.name}, your team picks next.`
+                    : `🎉 Great steal, ${currentTeamData?.name}!`}
                 </p>
                 <p className="text-blue-200 mb-6">
                   Would you like to continue with <strong>{columnThemes[stolenColumn]}</strong> or pick a new theme?

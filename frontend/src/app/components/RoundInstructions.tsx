@@ -2,7 +2,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { RoundType } from '@/app/types/game';
 import { motion } from 'motion/react';
-import { Play, Clock, Target, Zap, Trophy, Lightbulb, SkipForward } from 'lucide-react';
+import { Play, Clock, Target, Zap, Trophy, Lightbulb, SkipForward, Theater } from 'lucide-react';
 
 interface RoundInstructionsProps {
   roundType: RoundType;
@@ -93,45 +93,68 @@ const ROUND_INSTRUCTIONS: Record<RoundType, {
       'Correct guess = points, based on time remaining',
       'Faster guesses = more points'
     ]
+  },
+  'dump-charades': {
+    title: 'Dump Charades',
+    icon: <Theater className="h-12 w-12" />,
+    description: 'One player acts out the word without speaking!',
+    rules: [
+      'One team member sees the secret word',
+      'They act it out without speaking',
+      'No props, letters, or lip syncing',
+      'Their team has limited time to guess',
+      'Correct guess = +200 points',
+      'Incorrect guess = 0 points'
+    ]
   }
 };
 
 export function RoundInstructions({ roundType, isHost, onStart, onSkip }: RoundInstructionsProps) {
   const instructions = ROUND_INSTRUCTIONS[roundType];
+  const containerPadding = isHost ? 'p-4 sm:p-8' : 'p-1 sm:p-2 pb-0 sm:pb-0';
+  const cardPadding = isHost
+    ? 'p-4 sm:p-8'
+    : 'px-2 pt-2 pb-1 sm:px-4 sm:pt-3 sm:pb-2';
+  const headerSpacing = isHost ? 'mb-4 sm:mb-8' : 'mb-2 sm:mb-2';
+  const rulesSpacing = isHost ? 'mb-4 sm:mb-6' : 'mb-1 sm:mb-2';
+
+  const containerHeight = isHost ? 'min-h-screen' : 'h-full';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-8 flex items-center justify-center">
+    <div className={`${containerHeight} bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 ${containerPadding} ${isHost ? 'flex items-center justify-center' : 'flex items-start justify-center'}`}>
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="max-w-4xl w-full"
+        className={`max-w-4xl w-full ${isHost ? '' : 'pt-1'}`}
       >
         <Card className="border-4 border-yellow-400 shadow-2xl">
-          <CardContent className="p-8">
+          <CardContent className={cardPadding}>
             {/* Header */}
-            <div className="text-center mb-8">
+            <div className={`${isHost ? 'text-center' : 'text-left'} ${headerSpacing}`}>
               <motion.div
                 initial={{ y: -20 }}
                 animate={{ y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="flex justify-center mb-4 text-yellow-500"
+                className={`${isHost ? 'flex justify-center' : 'flex justify-start'} mb-3 sm:mb-4 text-yellow-500`}
               >
-                {instructions.icon}
+                <div className={`flex items-center gap-3 ${isHost ? 'justify-center' : 'justify-start'}`}>
+                  <span className="text-2xl sm:text-5xl">{instructions.icon}</span>
+                  <motion.h1
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    className={`${isHost ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-4xl'} font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent`}
+                  >
+                    {instructions.title}
+                  </motion.h1>
+                </div>
               </motion.div>
-              <motion.h1
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="text-5xl font-bold mb-3 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
-              >
-                {instructions.title}
-              </motion.h1>
               <motion.p
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="text-xl text-gray-600"
+                className={`${isHost ? 'text-base sm:text-xl' : 'text-sm sm:text-base'} text-gray-600`}
               >
                 {instructions.description}
               </motion.p>
@@ -142,13 +165,13 @@ export function RoundInstructions({ roundType, isHost, onStart, onSkip }: RoundI
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.5 }}
-              className="mb-6"
+              className={rulesSpacing}
             >
-              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                <Clock className="h-6 w-6 text-purple-600" />
+              <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                 How to Play
               </h2>
-              <ul className="space-y-3">
+              <ul className="space-y-2 sm:space-y-3">
                 {instructions.rules.map((rule, index) => (
                   <motion.li
                     key={index}
@@ -157,10 +180,10 @@ export function RoundInstructions({ roundType, isHost, onStart, onSkip }: RoundI
                     transition={{ duration: 0.3, delay: 0.6 + index * 0.1 }}
                     className="flex items-start gap-3"
                   >
-                    <span className="flex-shrink-0 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                    <span className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs sm:text-sm font-bold">
                       {index + 1}
                     </span>
-                    <span className="text-gray-700 pt-0.5">{rule}</span>
+                    <span className={`${isHost ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} text-gray-700 pt-0.5`}>{rule}</span>
                   </motion.li>
                 ))}
               </ul>
@@ -174,22 +197,22 @@ export function RoundInstructions({ roundType, isHost, onStart, onSkip }: RoundI
               className="text-center"
             >
               {isHost ? (
-                <div className="flex gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
                   <Button
                     onClick={onStart}
                     size="lg"
-                    className="text-xl px-12 py-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
+                    className="text-base sm:text-xl px-6 sm:px-12 py-4 sm:py-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
                   >
-                    <Play className="h-6 w-6 mr-3" />
+                    <Play className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
                     Start Round
                   </Button>
                   <Button
                     onClick={onSkip}
                     size="lg"
                     variant="outline"
-                    className="text-xl px-12 py-6 border-2 border-gray-400 hover:bg-gray-100"
+                    className="text-base sm:text-xl px-6 sm:px-12 py-4 sm:py-6 border-2 border-gray-400 hover:bg-gray-100"
                   >
-                    <SkipForward className="h-6 w-6 mr-3" />
+                    <SkipForward className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
                     Skip Round
                   </Button>
                 </div>

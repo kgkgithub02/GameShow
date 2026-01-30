@@ -11,6 +11,7 @@ RoundType = Literal[
     "connect-4",
     "guess-number",
     "blind-draw",
+    "dump-charades",
 ]
 
 
@@ -151,6 +152,9 @@ class RoundSettingsIn(BaseModel):
     blind_draw_seconds: int | None = Field(default=None, alias="blindDrawSeconds")
     blind_draw_difficulty: Difficulty | None = Field(default=None, alias="blindDrawDifficulty")
     blind_draw_word_count: int | None = Field(default=None, alias="blindDrawWordCount")
+    dump_charades_seconds: int | None = Field(default=None, alias="dumpCharadesSeconds")
+    dump_charades_difficulty: Difficulty | None = Field(default=None, alias="dumpCharadesDifficulty")
+    dump_charades_category: str | None = Field(default=None, alias="dumpCharadesCategory")
 
 
 class QuestionOut(BaseModel):
@@ -178,6 +182,7 @@ class GeneratedQuestions(BaseModel):
     guessNumber: list[GuessNumberQuestion] | None = None
     connect4: list[Connect4Question] | None = None
     blindDraw: list[str] | None = None
+    dumpCharades: list[str] | None = None
 
 
 class GenerateQuestionsRequest(BaseModel):

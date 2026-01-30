@@ -181,6 +181,21 @@ def _is_connect4_question(text: str, answer: str | None, category: str | None) -
     return any(phrase in combined for phrase in banned_phrases)
 
 
+def _coerce_guess_number_answer(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int,)):
+        return value
+    if isinstance(value, (float,)):
+        return int(round(value))
+    if isinstance(value, str):
+        try:
+            return int(round(float(value.strip())))
+        except ValueError:
+            return 0
+    return 0
+
+
 async def generate_questions(payload: schemas.GenerateQuestionsRequest) -> schemas.GeneratedQuestions:
     rounds = payload.rounds
     settings = payload.round_settings
@@ -218,7 +233,13 @@ async def generate_questions(payload: schemas.GenerateQuestionsRequest) -> schem
             f"Generate {count} questions. Answers must be numbers."
         )
         data = await _call_llm(prompt)
-        generated.guessNumber = [schemas.GuessNumberQuestion(**q) for q in data["questions"]]
+        generated.guessNumber = [
+            schemas.GuessNumberQuestion(
+                question=q.get("question", ""),
+                answer=_coerce_guess_number_answer(q.get("answer")),
+            )
+            for q in data["questions"]
+        ]
 
     if "connect-4" in rounds:
         themes = settings.connect4_themes or ["general", "science", "history", "pop-culture"]
@@ -295,6 +316,19 @@ async def generate_questions(payload: schemas.GenerateQuestionsRequest) -> schem
         data = await _call_llm(prompt)
         generated.blindDraw = list(data["words"])
 
+    if "dump-charades" in rounds:
+        count = settings.blind_draw_word_count or 5
+        difficulty = settings.dump_charades_difficulty or "medium-hard"
+        category = (settings.dump_charades_category or "general").strip()
+        prompt = (
+            "Generate charades prompt words or short phrases as JSON with this schema: "
+            '{"words":["word1","word2"]}. '
+            f"Generate {count} items. difficulty='{difficulty}'. "
+            f"Category='{category}'. Avoid explicit or offensive content."
+        )
+        data = await _call_llm(prompt)
+        generated.dumpCharades = list(data["words"])
+
     return generated
 
 
@@ -331,7 +365,10 @@ async def regenerate_question(payload: schemas.RegenerateQuestionRequest) -> sch
         data = await _call_llm(prompt)
         return schemas.RegenerateQuestionResponse(
             round_type=round_type,
-            guess_number=schemas.GuessNumberQuestion(**data["question"]),
+            guess_number=schemas.GuessNumberQuestion(
+                question=data["question"].get("question", ""),
+                answer=_coerce_guess_number_answer(data["question"].get("answer")),
+            ),
         )
 
     if round_type == "connect-4":
@@ -375,6 +412,17 @@ async def regenerate_question(payload: schemas.RegenerateQuestionRequest) -> sch
             "Generate ONE drawing word as JSON with this schema: "
             '{"word":"..."} '
             f"difficulty='{difficulty}'."
+        )
+        data = await _call_llm(prompt)
+        return schemas.RegenerateQuestionResponse(round_type=round_type, word=data["word"])
+
+    if round_type == "dump-charades":
+        difficulty = payload.difficulty or "medium-hard"
+        category = payload.category or "general"
+        prompt = (
+            "Generate ONE charades prompt as JSON with this schema: "
+            '{"word":"..."} '
+            f"difficulty='{difficulty}'. Category='{category}'."
         )
         data = await _call_llm(prompt)
         return schemas.RegenerateQuestionResponse(round_type=round_type, word=data["word"])

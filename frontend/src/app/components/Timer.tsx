@@ -44,9 +44,10 @@ export function Timer({ seconds, value, onComplete, running = true, size = 'md' 
     return () => clearInterval(interval);
   }, [running, timeLeft, onComplete, isControlled]);
 
-  const percentage = (effectiveTime / seconds) * 100;
+  const percentage = Math.min(Math.max((effectiveTime / seconds) * 100, 0), 100);
   const isLow = effectiveTime <= 10;
   const isCritical = effectiveTime <= 5;
+  const circumference = 2 * Math.PI * 45;
 
   const sizeClasses = {
     sm: 'text-2xl w-16 h-16',
@@ -57,23 +58,23 @@ export function Timer({ seconds, value, onComplete, running = true, size = 'md' 
   return (
     <div className="flex items-center justify-center">
       <div className="relative">
-        <svg className={`${sizeClasses[size]} transform -rotate-90`}>
+        <svg viewBox="0 0 100 100" className={`${sizeClasses[size]} transform -rotate-90`}>
           <circle
-            cx="50%"
-            cy="50%"
-            r="45%"
+            cx="50"
+            cy="50"
+            r="45"
             fill="none"
             stroke="rgba(255,255,255,0.1)"
             strokeWidth="8"
           />
           <circle
-            cx="50%"
-            cy="50%"
-            r="45%"
+            cx="50"
+            cy="50"
+            r="45"
             fill="none"
             stroke={isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#3b82f6'}
             strokeWidth="8"
-            strokeDasharray={`${percentage * 2.83} 283`}
+            strokeDasharray={`${(percentage / 100) * circumference} ${circumference}`}
             strokeLinecap="round"
             className="transition-all duration-300"
           />

@@ -31,6 +31,39 @@ interface GameSetupProps {
 
 const TEAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
+const CONNECT4_THEME_OPTIONS = [
+  { value: 'general', label: '🎲 General' },
+  { value: 'science', label: '🔬 Science' },
+  { value: 'history', label: '📚 History' },
+  { value: 'pop-culture', label: '🎬 Pop Culture' },
+  { value: 'sports', label: '⚽ Sports & Athletics' },
+  { value: 'geography', label: '🌍 Geography' },
+  { value: 'entertainment', label: '🎭 Entertainment' },
+  { value: 'music', label: '🎵 Music' },
+  { value: 'literature', label: '📖 Literature' },
+  { value: 'technology', label: '💻 Technology' },
+  { value: 'food-drink', label: '🍕 Food & Drink' },
+  { value: 'fashion', label: '👗 Fashion' },
+  { value: 'nature-animals', label: '🦁 Nature & Animals' },
+  { value: 'space-astronomy', label: '🚀 Space & Astronomy' },
+  { value: 'business-economics', label: '💼 Business & Economics' },
+  { value: 'current-events', label: '📰 Current Events' },
+  { value: 'world-records', label: '🏆 World Records' },
+  { value: 'quotes-sayings', label: '💬 Quotes & Sayings' },
+  { value: 'inventions', label: '💡 Inventions' },
+];
+
+const DEFAULT_CONNECT4_THEMES = ['general', 'science', 'history', 'pop-culture'];
+
+const DUMP_CHARADES_CATEGORIES = [
+  { value: 'general', label: '🎲 General' },
+  { value: 'animals', label: '🦁 Animals' },
+  { value: 'actions', label: '🏃 Actions' },
+  { value: 'movies', label: '🎬 Movies' },
+  { value: 'sports', label: '⚽ Sports' },
+  { value: 'professions', label: '🧰 Professions' },
+];
+
 const ALL_ROUNDS: { type: RoundType; name: string; description: string }[] = [
   { type: 'trivia-buzz', name: 'Trivia Buzz', description: 'Buzz-in trivia questions' },
   { type: 'lightning', name: 'Lightning Round', description: '60-second rapid fire' },
@@ -38,6 +71,7 @@ const ALL_ROUNDS: { type: RoundType; name: string; description: string }[] = [
   { type: 'connect-4', name: 'Connect 4', description: 'Strategy board game' },
   { type: 'guess-number', name: 'Guess the Number', description: 'Closest estimate wins' },
   { type: 'blind-draw', name: 'Blind Draw', description: 'Guess the drawing' },
+  { type: 'dump-charades', name: 'Dump Charades', description: 'Act it out without words' },
 ];
 
 export function GameSetup({
@@ -62,10 +96,13 @@ export function GameSetup({
     guessNumberSeconds: 30,
     guessNumberQuestions: 10,
     guessNumberDifficulty: 'medium-hard',
-    connect4Themes: ['general', 'science', 'history', 'pop-culture'],
+    connect4Themes: DEFAULT_CONNECT4_THEMES,
     connect4Difficulty: 'medium-hard',
     blindDrawSeconds: 60,
     blindDrawDifficulty: 'medium-hard',
+    dumpCharadesSeconds: 60,
+    dumpCharadesDifficulty: 'medium-hard',
+    dumpCharadesCategory: 'general',
   });
   const [submitting, setSubmitting] = useState(false);
   const [creatingOnline, setCreatingOnline] = useState(false);
@@ -179,7 +216,7 @@ export function GameSetup({
   }, [mode, gameCode, creatingOnline, selectedRounds, teams, hostPin]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-white mb-2">Game Show Setup</h1>
@@ -579,16 +616,26 @@ export function GameSetup({
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Question Themes (one per column)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[0, 1, 2, 3].map((colIndex) => (
-                        <div key={colIndex}>
+                      {[0, 1, 2, 3].map((colIndex) => {
+                        const currentTheme =
+                          roundSettings.connect4Themes?.[colIndex] || DEFAULT_CONNECT4_THEMES[colIndex];
+                        const isPreset = CONNECT4_THEME_OPTIONS.some(option => option.value === currentTheme);
+                        const selectValue = isPreset ? currentTheme : 'custom';
+                        const customValue = !isPreset ? (currentTheme === 'custom' ? '' : currentTheme) : '';
+                        return (
+                        <div key={colIndex} className="space-y-2">
                           <Label htmlFor={`connect4-theme-${colIndex}`} className="text-xs text-gray-600">
                             Column {colIndex + 1}
                           </Label>
                           <Select
-                            value={roundSettings.connect4Themes?.[colIndex] || 'general'}
+                            value={selectValue}
                             onValueChange={(value) => {
-                              const newThemes = [...(roundSettings.connect4Themes || ['general', 'science', 'history', 'pop-culture'])];
-                              newThemes[colIndex] = value as any;
+                              const newThemes = [...(roundSettings.connect4Themes || DEFAULT_CONNECT4_THEMES)];
+                              if (value === 'custom') {
+                                newThemes[colIndex] = isPreset ? 'custom' : currentTheme;
+                              } else {
+                                newThemes[colIndex] = value as any;
+                              }
                               setRoundSettings({
                                 ...roundSettings,
                                 connect4Themes: newThemes as any,
@@ -599,29 +646,33 @@ export function GameSetup({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="general">🎲 General</SelectItem>
-                              <SelectItem value="science">🔬 Science</SelectItem>
-                              <SelectItem value="history">📚 History</SelectItem>
-                              <SelectItem value="pop-culture">🎬 Pop Culture</SelectItem>
-                              <SelectItem value="sports">⚽ Sports & Athletics</SelectItem>
-                              <SelectItem value="geography">🌍 Geography</SelectItem>
-                              <SelectItem value="entertainment">🎭 Entertainment</SelectItem>
-                              <SelectItem value="music">🎵 Music</SelectItem>
-                              <SelectItem value="literature">📖 Literature</SelectItem>
-                              <SelectItem value="technology">💻 Technology</SelectItem>
-                              <SelectItem value="food-drink">🍕 Food & Drink</SelectItem>
-                              <SelectItem value="fashion">👗 Fashion</SelectItem>
-                              <SelectItem value="nature-animals">🦁 Nature & Animals</SelectItem>
-                              <SelectItem value="space-astronomy">🚀 Space & Astronomy</SelectItem>
-                              <SelectItem value="business-economics">💼 Business & Economics</SelectItem>
-                              <SelectItem value="current-events">📰 Current Events</SelectItem>
-                              <SelectItem value="world-records">🏆 World Records</SelectItem>
-                              <SelectItem value="quotes-sayings">💬 Quotes & Sayings</SelectItem>
-                              <SelectItem value="inventions">💡 Inventions</SelectItem>
+                              {CONNECT4_THEME_OPTIONS.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="custom">✨ Custom</SelectItem>
                             </SelectContent>
                           </Select>
+                          {selectValue === 'custom' && (
+                            <Input
+                              value={customValue}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                const newThemes = [...(roundSettings.connect4Themes || DEFAULT_CONNECT4_THEMES)];
+                                newThemes[colIndex] = nextValue.trim() ? nextValue : 'custom';
+                                setRoundSettings({
+                                  ...roundSettings,
+                                  connect4Themes: newThemes as any,
+                                });
+                              }}
+                              placeholder="Enter custom theme"
+                              className="h-9 text-sm"
+                            />
+                          )}
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   </div>
                   <div>
@@ -779,6 +830,121 @@ export function GameSetup({
                         (default: 60)
                       </span>
                     </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Dump Charades */}
+            <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center space-x-3 mb-3">
+                <Checkbox
+                  id="dump-charades"
+                  checked={selectedRounds.includes('dump-charades')}
+                  onCheckedChange={() => toggleRound('dump-charades')}
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="dump-charades"
+                    className="font-medium cursor-pointer text-lg"
+                  >
+                    🎭 Dump Charades
+                  </label>
+                  <p className="text-sm text-gray-500">Act it out without words</p>
+                </div>
+              </div>
+              {selectedRounds.includes('dump-charades') && (
+                <div className="ml-8 pt-2 border-t space-y-3">
+                  <div>
+                    <Label htmlFor="dump-charades-seconds" className="text-sm">Time Limit (seconds)</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Input
+                        id="dump-charades-seconds"
+                        type="number"
+                        min="1"
+                        value={roundSettings.dumpCharadesSeconds}
+                        onChange={(e) =>
+                          setRoundSettings({
+                            ...roundSettings,
+                            dumpCharadesSeconds: parseInt(e.target.value) || 60,
+                          })
+                        }
+                        className="w-24"
+                      />
+                      <span className="text-sm text-gray-500">
+                        (default: 60)
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="dump-charades-category" className="text-sm">Category</Label>
+                    <Select
+                      value={
+                        DUMP_CHARADES_CATEGORIES.some(option => option.value === (roundSettings.dumpCharadesCategory || 'general'))
+                          ? (roundSettings.dumpCharadesCategory || 'general')
+                          : 'custom'
+                      }
+                      onValueChange={(value) => {
+                        if (value === 'custom') {
+                          setRoundSettings({
+                            ...roundSettings,
+                            dumpCharadesCategory: 'custom',
+                          });
+                          return;
+                        }
+                        setRoundSettings({
+                          ...roundSettings,
+                          dumpCharadesCategory: value,
+                        });
+                      }}
+                    >
+                      <SelectTrigger id="dump-charades-category" className="w-full mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DUMP_CHARADES_CATEGORIES.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">✨ Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!(DUMP_CHARADES_CATEGORIES.some(option => option.value === (roundSettings.dumpCharadesCategory || 'general'))) && (
+                      <Input
+                        value={roundSettings.dumpCharadesCategory === 'custom' ? '' : (roundSettings.dumpCharadesCategory || '')}
+                        onChange={(event) =>
+                          setRoundSettings({
+                            ...roundSettings,
+                            dumpCharadesCategory: event.target.value,
+                          })
+                        }
+                        placeholder="Enter custom category"
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="dump-charades-difficulty" className="text-sm">Difficulty Level</Label>
+                    <Select
+                      value={roundSettings.dumpCharadesDifficulty || 'medium-hard'}
+                      onValueChange={(value) =>
+                        setRoundSettings({
+                          ...roundSettings,
+                          dumpCharadesDifficulty: value as Difficulty,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="dump-charades-difficulty" className="w-full mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="medium-hard">Mid-Hard (Default)</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}

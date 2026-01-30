@@ -131,6 +131,20 @@ export function QuestionReview({
           setQuestions(updated);
         }
       }
+
+      if (roundType === 'dump-charades' && questions.dumpCharades) {
+        const response = await regenerateQuestion({
+          round_type: roundType,
+          difficulty: roundSettings.dumpCharadesDifficulty || 'medium-hard',
+          category: roundSettings.dumpCharadesCategory || null,
+        });
+        if (response.word) {
+          const updated = { ...questions };
+          updated.dumpCharades = [...questions.dumpCharades];
+          updated.dumpCharades[index] = response.word;
+          setQuestions(updated);
+        }
+      }
     } catch (error) {
       console.error(error);
       alert('Failed to regenerate question. Check backend config and try again.');
@@ -147,6 +161,7 @@ export function QuestionReview({
       'connect-4': '🎯 Connect 4',
       'guess-number': '🔢 Guess the Number',
       'blind-draw': '🎨 Blind Draw',
+      'dump-charades': '🎭 Dump Charades',
     };
     return titles[roundType];
   };
@@ -163,6 +178,8 @@ export function QuestionReview({
         return questions.connect4?.length || 0;
       case 'blind-draw':
         return questions.blindDraw?.length || 0;
+      case 'dump-charades':
+        return questions.dumpCharades?.length || 0;
       default:
         return 0;
     }
@@ -479,9 +496,9 @@ export function QuestionReview({
                                 : 'bg-white'
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="font-semibold text-sm text-gray-600">
                                     Column {item.column + 1} ({columnTheme}), {rowLabel}
                                   </span>
@@ -510,6 +527,7 @@ export function QuestionReview({
                                 size="sm"
                                 onClick={() => handleRegenerate('connect-4', index)}
                                 disabled={regeneratingIndex !== null}
+                                className="self-start sm:self-center shrink-0"
                               >
                                 <RefreshCw className={`h-4 w-4 ${regeneratingIndex?.round === 'connect-4' && regeneratingIndex?.index === index ? 'animate-spin' : ''}`} />
                               </Button>
@@ -573,6 +591,66 @@ export function QuestionReview({
                               disabled={regeneratingIndex !== null}
                             >
                               <RefreshCw className={`h-4 w-4 ${regeneratingIndex?.round === 'blind-draw' && regeneratingIndex?.index === index ? 'animate-spin' : ''}`} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Card>
+          )}
+
+          {/* Dump Charades */}
+          {rounds.includes('dump-charades') && questions.dumpCharades && (
+            <Card>
+              <CardHeader 
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => toggleRound('dump-charades')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      {expandedRounds.has('dump-charades') ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                      {getRoundTitle('dump-charades')}
+                    </CardTitle>
+                    <CardDescription>{getQuestionCount('dump-charades')} words to act</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <AnimatePresence>
+                {expandedRounds.has('dump-charades') && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <CardContent className="space-y-3 pt-0">
+                      {questions.dumpCharades.map((word, index) => (
+                        <div 
+                          key={index} 
+                          className={`border rounded-lg p-4 ${
+                            regeneratingIndex?.round === 'dump-charades' && regeneratingIndex?.index === index
+                              ? 'bg-blue-50 border-blue-300'
+                              : 'bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold text-sm text-gray-600">Round {index + 1}</span>
+                              </div>
+                              <p className="font-medium text-lg">{word}</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRegenerate('dump-charades', index)}
+                              disabled={regeneratingIndex !== null}
+                            >
+                              <RefreshCw className={`h-4 w-4 ${regeneratingIndex?.round === 'dump-charades' && regeneratingIndex?.index === index ? 'animate-spin' : ''}`} />
                             </Button>
                           </div>
                         </div>

@@ -48,11 +48,13 @@ export function PlayerGuessNumber({
   const submittedQuestionRef = useRef<number | null>(null);
   const draftTimerRef = useRef<number | null>(null);
   const lastDraftRef = useRef<string | null>(null);
+  const [lockedLocally, setLockedLocally] = useState(false);
 
   useEffect(() => {
     setGuessValue('');
     submittedQuestionRef.current = null;
     lastDraftRef.current = null;
+    setLockedLocally(false);
     if (draftTimerRef.current) {
       window.clearTimeout(draftTimerRef.current);
       draftTimerRef.current = null;
@@ -60,6 +62,7 @@ export function PlayerGuessNumber({
   }, [questionId]);
 
   const hasSubmitted = submittedGuess !== undefined && submittedGuess !== null;
+  const inputDisabled = !canSubmit || hasSubmitted || lockedLocally;
 
   useEffect(() => {
     if (submittedGuess === undefined || submittedGuess === null) return;
@@ -111,6 +114,17 @@ export function PlayerGuessNumber({
     onSubmitGuess(parsed);
   }, [timeRemaining, revealed, questionId, guessValue, onSubmitGuess]);
 
+  const handleLockGuess = () => {
+    if (!canSubmit) return;
+    if (hasSubmitted || lockedLocally) return;
+    if (guessValue.trim() === '') return;
+    const parsed = Number(guessValue);
+    if (Number.isNaN(parsed)) return;
+    submittedQuestionRef.current = questionId;
+    setLockedLocally(true);
+    onSubmitGuess(parsed);
+  };
+
   return (
     <div className="space-y-4">
       {/* Timer Display */}
@@ -154,13 +168,26 @@ export function PlayerGuessNumber({
                 onChange={(event) => setGuessValue(event.target.value)}
                 placeholder="Enter your number"
                 className="bg-white/10 border-white/20 text-white text-lg placeholder:text-white/70"
-                disabled={!canSubmit}
+                disabled={inputDisabled}
               />
+              <button
+                type="button"
+                onClick={handleLockGuess}
+                disabled={inputDisabled || guessValue.trim() === '' || Number.isNaN(Number(guessValue))}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                  inputDisabled || guessValue.trim() === '' || Number.isNaN(Number(guessValue))
+                    ? 'bg-white/10 text-white/50'
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+              >
+                Lock In
+              </button>
             </div>
             {hasSubmitted && (
-              <div className="mt-3 text-sm text-green-300">
-                Submitted after time expired.
-              </div>
+              <div className="mt-3 text-sm text-green-300">Locked in.</div>
+            )}
+            {lockedLocally && !hasSubmitted && (
+              <div className="mt-3 text-sm text-green-300">Locked in.</div>
             )}
             {canSubmit && (
               <div className="mt-3 text-sm text-blue-200">

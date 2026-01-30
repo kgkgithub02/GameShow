@@ -39,22 +39,22 @@ export function PlayerLightning({
       {/* Timer and Progress */}
       {!isComplete && (
         <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <Clock className="h-8 w-8 text-white" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-white">{timeRemaining}s</div>
-                  <div className="text-sm text-blue-200">Remaining</div>
+                  <div className="text-2xl sm:text-4xl font-bold text-white">{timeRemaining}s</div>
+                  <div className="text-xs sm:text-sm text-blue-200">Remaining</div>
                 </div>
               </div>
               <div className="text-right">
-              <div className="text-3xl font-bold text-white">
+              <div className="text-2xl sm:text-3xl font-bold text-white">
                 {questionProgressText}
               </div>
-              <div className="text-sm text-blue-200">Questions</div>
+              <div className="text-xs sm:text-sm text-blue-200">Questions</div>
               </div>
             </div>
 
@@ -103,7 +103,7 @@ export function PlayerLightning({
       </Card>
 
       {/* Current Question */}
-      {question && yourTurn && !isComplete && (
+      {question && !isComplete && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}

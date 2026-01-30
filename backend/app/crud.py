@@ -232,6 +232,12 @@ def send_buzz(
     if not state.can_buzz or state.buzzed_team_id:
         return False, "Cannot buzz right now"
 
+    round_data = state.round_data or {}
+    trivia_data = dict(round_data.get("trivia") or {})
+    incorrect_team_id = trivia_data.get("incorrect_team_id")
+    if incorrect_team_id and incorrect_team_id == team_id:
+        return False, "Only the opposing team can steal"
+
     resolved_player_name = player_name
     if player_id and not resolved_player_name:
         player = (
@@ -241,8 +247,6 @@ def send_buzz(
         if player:
             resolved_player_name = player.name
 
-    round_data = state.round_data or {}
-    trivia_data = dict(round_data.get("trivia") or {})
     trivia_data["buzzed_player_id"] = player_id
     trivia_data["buzzed_player_name"] = resolved_player_name
     round_data["trivia"] = trivia_data

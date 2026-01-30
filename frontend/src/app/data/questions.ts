@@ -121,6 +121,41 @@ export const blindDrawWords = {
   hard: ['graduation', 'celebration', 'confusion', 'excitement', 'imagination', 'discovery', 'transformation'],
 };
 
+export const dumpCharadesWords: Record<Difficulty, Record<string, string[]>> = {
+  easy: {
+    general: ['toothbrush', 'pencil', 'pizza', 'bicycle', 'balloon', 'rain'],
+    animals: ['cat', 'dog', 'fish', 'bird', 'rabbit'],
+    actions: ['sleeping', 'jumping', 'dancing', 'waving', 'clapping'],
+    movies: ['lion king', 'frozen', 'toy story'],
+    sports: ['soccer', 'basketball', 'tennis'],
+    professions: ['teacher', 'doctor', 'chef'],
+  },
+  medium: {
+    general: ['campfire', 'roller coaster', 'birthday party', 'camping'],
+    animals: ['dolphin', 'kangaroo', 'penguin', 'turtle'],
+    actions: ['rock climbing', 'ice skating', 'washing dishes'],
+    movies: ['harry potter', 'spider-man', 'jurassic park'],
+    sports: ['baseball', 'volleyball', 'golf'],
+    professions: ['firefighter', 'pilot', 'photographer'],
+  },
+  "medium-hard": {
+    general: ['time machine', 'traffic jam', 'snowstorm', 'escape room'],
+    animals: ['chameleon', 'octopus', 'flamingo'],
+    actions: ['baking a cake', 'fixing a car', 'playing violin'],
+    movies: ['lord of the rings', 'matrix', 'inception'],
+    sports: ['fencing', 'gymnastics', 'hockey'],
+    professions: ['architect', 'journalist', 'scientist'],
+  },
+  hard: {
+    general: ['stock market', 'space station', 'northern lights'],
+    animals: ['platypus', 'sloth', 'narwhal'],
+    actions: ['conducting an orchestra', 'solving a puzzle', 'parachuting'],
+    movies: ['interstellar', 'shawshank redemption', 'pulp fiction'],
+    sports: ['cricket', 'rugby', 'water polo'],
+    professions: ['detective', 'astronaut', 'surgeon'],
+  },
+};
+
 export function getRandomQuestion(pool: Question[], difficulty?: Difficulty): Question {
   const filtered = difficulty 
     ? pool.filter(q => q.difficulty === difficulty)
