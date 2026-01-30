@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Brush, Eraser, RotateCcw, Clock, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
+import { updateGameState } from '@/services/gameService';
 
 interface PlayerBlindDrawProps {
   word: string | null; // Only shown to drawer
@@ -10,7 +11,10 @@ interface PlayerBlindDrawProps {
   isGuessingTeam?: boolean;
   timeRemaining: number;
   teamColor: string;
-  phase: 'drawing' | 'judging' | 'complete';
+  isActive: boolean;
+  drawingData: string | null;
+  gameId: string;
+  phase: 'prep' | 'drawing' | 'judging' | 'complete';
   result?: 'guessed' | 'missed' | null;
 }
 
@@ -20,6 +24,9 @@ export function PlayerBlindDraw({
   isGuessingTeam = false,
   timeRemaining,
   teamColor,
+  isActive,
+  drawingData,
+  gameId,
   phase,
   result,
 }: PlayerBlindDrawProps) {
@@ -27,6 +34,7 @@ export function PlayerBlindDraw({
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushSize, setBrushSize] = useState(3);
   const [color, setColor] = useState('#FFFFFF');
+  const lastSyncRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,46 +47,73 @@ export function PlayerBlindDraw({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawer || phase !== 'drawing') return;
-    setIsDrawing(true);
-    
+  const getCanvasPoint = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
+  const syncDrawing = useCallback((force = false) => {
+    if (!gameId || !isDrawer || phase !== 'drawing' || !isActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const now = Date.now();
+    if (!force && now - lastSyncRef.current < 500) return;
+    lastSyncRef.current = now;
+    const dataUrl = canvas.toDataURL('image/png');
+    updateGameState(gameId, {
+      round_data: {
+        blind_draw: {
+          drawing_data: dataUrl,
+        },
+      },
+    }).catch(() => undefined);
+  }, [gameId, isDrawer, phase, isActive]);
 
-    const rect = canvas.getBoundingClientRect();
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawer || phase !== 'drawing' || !isActive) return;
+    setIsDrawing(true);
+    
+    const point = getCanvasPoint(e);
+    if (!point) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
 
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(point.x, point.y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !isDrawer || phase !== 'drawing') return;
+    if (!isDrawing || !isDrawer || phase !== 'drawing' || !isActive) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const point = getCanvasPoint(e);
+    if (!point) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
 
     ctx.strokeStyle = color;
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
-    ctx.lineTo(x, y);
+    ctx.lineTo(point.x, point.y);
     ctx.stroke();
+    syncDrawing();
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    syncDrawing(true);
   };
 
   const clearCanvas = () => {
@@ -91,6 +126,36 @@ export function PlayerBlindDraw({
     ctx.fillStyle = '#1F2937';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
+
+  if (phase === 'prep') {
+    return (
+      <div className="space-y-4">
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20">
+          <CardContent className="pt-6 pb-6">
+            <div className="text-center space-y-3">
+              <p className="text-lg font-bold text-white">How to Play: Blind Draw</p>
+              <p className="text-blue-200 text-sm">
+                The host is setting up the round. Get ready!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-500/20 backdrop-blur-xl border-blue-500/50">
+          <CardContent className="pt-4 pb-4">
+            <div className="space-y-2 text-sm text-white">
+              <p className="font-bold text-blue-300">Rules:</p>
+              <ul className="space-y-1 text-blue-100">
+                <li>🎨 One player draws while blindfolded</li>
+                <li>🗣️ Team guesses out loud</li>
+                <li>⏱️ You have {timeRemaining}s</li>
+                <li>✅ Correct: +200 points</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -126,7 +191,7 @@ export function PlayerBlindDraw({
       )}
 
       {/* Word Display (Drawer Only) */}
-      {isDrawer && word && phase === 'drawing' && (
+      {isDrawer && word && phase === 'drawing' && isActive && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -154,32 +219,51 @@ export function PlayerBlindDraw({
       <Card className="bg-white/10 backdrop-blur-xl border-white/20">
         <CardContent className="pt-6">
           <div className="relative">
-            <canvas
-              ref={canvasRef}
-              width={400}
-              height={400}
-              className="w-full h-auto border-2 border-white/20 rounded-lg touch-none"
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
-              style={{
-                cursor: isDrawer && phase === 'drawing' ? 'crosshair' : 'default',
-                maxHeight: '400px',
-              }}
-            />
-            {!isDrawer && phase === 'drawing' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-lg">
+            {isDrawer ? (
+              <>
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={400}
+                  className="w-full h-auto border-2 border-white/20 rounded-lg touch-none"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  style={{
+                    cursor: isDrawer && phase === 'drawing' && isActive ? 'crosshair' : 'default',
+                    maxHeight: '400px',
+                  }}
+                />
+                {phase === 'drawing' && !isActive && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-lg">
+                    <div className="text-center text-white">
+                      <EyeOff className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-lg font-bold">Waiting for host...</p>
+                      <p className="text-sm text-blue-200">Drawing starts when the host clicks Start Drawing.</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : drawingData ? (
+              <img
+                src={drawingData}
+                alt="Live drawing"
+                className="w-full h-auto rounded-lg border-2 border-white/20"
+                style={{ maxHeight: '400px' }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[300px] rounded-lg border-2 border-white/20 bg-black/30">
                 <div className="text-center text-white">
                   <EyeOff className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-lg font-bold">Drawing in Progress...</p>
+                  <p className="text-lg font-bold">Waiting for drawing…</p>
                   <p className="text-sm text-blue-200">
                     {isGuessingTeam
-                      ? 'Watch the main screen and guess with your team'
-                      : 'Watch the main screen'}
+                      ? 'Watch here and guess with your team'
+                      : 'Watch here for the drawing'}
                   </p>
                 </div>
               </div>
@@ -187,7 +271,7 @@ export function PlayerBlindDraw({
           </div>
 
           {/* Drawing Tools (Drawer Only) */}
-          {isDrawer && phase === 'drawing' && (
+          {isDrawer && phase === 'drawing' && isActive && (
             <div className="mt-4 space-y-3">
               {/* Color Picker */}
               <div className="flex items-center gap-2">
@@ -255,7 +339,7 @@ export function PlayerBlindDraw({
         <Card className="bg-green-500/20 backdrop-blur-xl border-green-500/50">
           <CardContent className="pt-4 pb-4">
             <div className="text-center text-white">
-              <p className="text-lg font-bold">Round Complete</p>
+              <p className="text-lg font-bold">Turn Complete</p>
               <p className="text-sm text-green-100">
                 {result === 'guessed'
                   ? 'Correct! +200 points.'

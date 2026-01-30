@@ -7,6 +7,9 @@ app = 'gameshow-frontend'
 primary_region = 'sjc'
 
 [build]
+  [build.args]
+    VITE_API_URL = "https://api.gamenitecentral.com"
+    VITE_WS_URL = "wss://api.gamenitecentral.com"
 
 [http_service]
   internal_port = 80

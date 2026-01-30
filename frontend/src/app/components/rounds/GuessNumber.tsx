@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Team, GuessNumberState } from '@/app/types/game';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
@@ -50,6 +50,7 @@ export function GuessNumber({
   const [questionsAsked, setQuestionsAsked] = useState(0);
   const [questionId, setQuestionId] = useState(0);
   const questionIdRef = useRef(0);
+  const startedRef = useRef(false);
   const totalQuestions = questions && questions.length ? questions.length : 10;
 
   const currentPlayerGuesses = useMemo(() => {
@@ -64,6 +65,26 @@ export function GuessNumber({
     }
     return drafts?.[questionId] || {};
   }, [gameState, questionId]);
+
+  const submittedGuesses = useMemo(() => {
+    const roundData = (gameState?.round_data as any) || {};
+    return roundData.guess_number?.player_guesses?.[questionId] || {};
+  }, [gameState, questionId]);
+
+  const submittedByTeam = useMemo(() => {
+    const grouped: Record<string, Array<{ playerName: string; guess: number }>> = {};
+    teams.forEach(team => {
+      grouped[team.id] = [];
+    });
+    Object.values(submittedGuesses).forEach((entry: any) => {
+      if (!entry || !entry.team_id) return;
+      const guessValue = Number(entry.guess);
+      if (Number.isNaN(guessValue)) return;
+      if (!grouped[entry.team_id]) grouped[entry.team_id] = [];
+      grouped[entry.team_id].push({ playerName: entry.player_name || 'Player', guess: guessValue });
+    });
+    return grouped;
+  }, [submittedGuesses, teams]);
 
   const guessesByTeam = useMemo(() => {
     const grouped: Record<string, Array<{ playerName: string; guess: number }>> = {};
@@ -123,34 +144,7 @@ export function GuessNumber({
     return () => window.clearInterval(interval);
   }, [state.isActive]);
 
-  const startRound = () => {
-    const nextQuestion =
-      questions && questions.length
-        ? questions[questionIndex % questions.length]
-        : getRandomGuessQuestion();
-    questionIdRef.current += 1;
-    setQuestionId(questionIdRef.current);
-    setState({
-      question: nextQuestion.question,
-      correctAnswer: nextQuestion.answer,
-      isActive: true,
-      timeRemaining: roundSeconds,
-    });
-    setRevealed(false);
-    setResults([]);
-    setManualWinnerTeamId(null);
-    setQuestionIndex(prev => prev + 1);
-  };
-
-  const handleTimeUp = () => {
-    setState(prev => ({
-      ...prev,
-      isActive: false,
-      timeRemaining: 0,
-    }));
-  };
-
-  const revealAnswer = () => {
+  const revealAnswer = useCallback(() => {
     if (!state.correctAnswer) return;
 
     const calculated = teams.map(team => {
@@ -194,6 +188,47 @@ export function GuessNumber({
     if (calculated.length >= 1 && !isTie && gameId) {
       onUpdateScore(calculated[0].teamId, 200);
     }
+  }, [gameId, guessesByTeam, onUpdateScore, state.correctAnswer, teams]);
+
+  useEffect(() => {
+    if (revealed || !state.isActive) return;
+    if (teams.length === 0) return;
+    const allTeamsLocked = teams.every(team => (submittedByTeam[team.id] || []).length > 0);
+    if (!allTeamsLocked) return;
+    setState(prev => ({
+      ...prev,
+      isActive: false,
+      timeRemaining: 0,
+    }));
+    revealAnswer();
+  }, [revealed, state.isActive, teams, submittedByTeam, revealAnswer]);
+
+  const startRound = () => {
+    const nextQuestion =
+      questions && questions.length
+        ? questions[questionIndex % questions.length]
+        : getRandomGuessQuestion();
+    questionIdRef.current += 1;
+    setQuestionId(questionIdRef.current);
+    setState({
+      question: nextQuestion.question,
+      correctAnswer: nextQuestion.answer,
+      isActive: true,
+      timeRemaining: roundSeconds,
+    });
+    setRevealed(false);
+    setResults([]);
+    setManualWinnerTeamId(null);
+    setQuestionIndex(prev => prev + 1);
+    startedRef.current = true;
+  };
+
+  const handleTimeUp = () => {
+    setState(prev => ({
+      ...prev,
+      isActive: false,
+      timeRemaining: 0,
+    }));
   };
 
   useEffect(() => {
@@ -205,6 +240,12 @@ export function GuessNumber({
   useEffect(() => {
     startRound();
   }, []);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    if (state.question || revealed) return;
+    startRound();
+  }, [state.question, revealed]);
 
   const handleManualWinnerSelect = (teamId: string) => {
     if (manualWinnerTeamId) return;
@@ -220,14 +261,23 @@ export function GuessNumber({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">🎯 Guess the Number</h2>
-        <p className="text-blue-200">
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">🎯 Guess the Number</h2>
+        <p className="text-blue-200 text-sm sm:text-base">
           Question {Math.min(questionsAsked + 1, totalQuestions)} of {totalQuestions}
         </p>
       </div>
 
+      {!state.question && !revealed && (
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardContent className="pt-6">
+              <div className="text-center text-blue-200">Loading question…</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       {state.question && !revealed && (
         <div className="max-w-3xl mx-auto space-y-6">
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
@@ -238,8 +288,8 @@ export function GuessNumber({
               </div>
 
               {/* Host Answer - Always Visible */}
-              <div className="bg-blue-500/20 border-2 border-blue-400 rounded-lg p-4 mb-6">
-                <p className="text-white text-center text-lg font-semibold">
+              <div className="bg-blue-500/20 border-2 border-blue-400 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                <p className="text-white text-center text-base sm:text-lg font-semibold">
                   {state.correctAnswer?.toLocaleString()}
                 </p>
               </div>

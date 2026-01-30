@@ -90,7 +90,7 @@ export default function App() {
           : newTeams.length;
     const settingsWithCounts: RoundSettings = {
       ...settings,
-      blindDrawWordCount: computedPlayerCount > 0 ? computedPlayerCount * 2 : settings.blindDrawWordCount,
+      blindDrawWordCount: computedPlayerCount > 0 ? computedPlayerCount * 4 : settings.blindDrawWordCount,
     };
 
     setTeams(newTeams);

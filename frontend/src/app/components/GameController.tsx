@@ -5,6 +5,7 @@ import { QuickBuild } from '@/app/components/rounds/QuickBuild';
 import { Connect4 } from '@/app/components/rounds/Connect4';
 import { GuessNumber } from '@/app/components/rounds/GuessNumber';
 import { BlindDraw } from '@/app/components/rounds/BlindDraw';
+import { DumpCharades } from '@/app/components/rounds/DumpCharades';
 import { Scoreboard } from '@/app/components/Scoreboard';
 import { HostGameCode } from '@/app/components/player/HostGameCode';
 import { Team, Difficulty, RoundType, RoundSettings } from '@/app/types/game';
@@ -15,7 +16,6 @@ import { SkipForward, RotateCcw, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGameSync } from '@/hooks/useGameSync';
 import { updateGame, updateGameState, updateTeamScore } from '@/services/gameService';
-
 interface GameControllerProps {
   teams: Team[];
   rounds: RoundType[];
@@ -35,6 +35,7 @@ const ROUND_NAMES: Record<RoundType, string> = {
   'connect-4': 'Connect 4',
   'guess-number': 'Guess the Number',
   'blind-draw': 'Blind Draw',
+  'dump-charades': 'Dump Charades',
 };
 
 export function GameController({
@@ -48,8 +49,17 @@ export function GameController({
   onReset,
   onUpdateLocalScore,
 }: GameControllerProps) {
-  const { teams: syncedTeams, gameState, game } = useGameSync(gameId);
-  const teams = useMemo(() => (syncedTeams.length ? syncedTeams : initialTeams), [syncedTeams, initialTeams]);
+  const { teams: syncedTeams, players: syncedPlayers, gameState, game } = useGameSync(gameId);
+  const [optimisticScores, setOptimisticScores] = useState<Record<string, number>>({});
+  const baseTeams = useMemo(() => (syncedTeams.length ? syncedTeams : initialTeams), [syncedTeams, initialTeams]);
+  const teams = useMemo(
+    () =>
+      baseTeams.map(team => ({
+        ...team,
+        score: optimisticScores[team.id] ?? team.score,
+      })),
+    [baseTeams, optimisticScores]
+  );
   const persistedQuestions = (gameState?.round_data as any)?.generated_questions as GeneratedQuestions | undefined;
   const hasLocalQuestions = useMemo(
     () => Object.keys(generatedQuestions || {}).length > 0,
@@ -60,19 +70,53 @@ export function GameController({
   const [showInstructions, setShowInstructions] = useState(true); // Start with instructions
   const [gameComplete, setGameComplete] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
-  const [roundBreakdowns, setRoundBreakdowns] = useState<
-    Array<{ roundType: RoundType; scores: Array<{ teamId: string; teamName: string; points: number }> }>
-  >([]);
+  type RoundBreakdown = {
+    roundIndex: number;
+    roundType: RoundType;
+    scores: Array<{ teamId: string; teamName: string; points: number }>;
+  };
+  const [roundBreakdowns, setRoundBreakdowns] = useState<Array<RoundBreakdown | undefined>>([]);
   const roundStartScoresRef = useRef<Record<string, number> | null>(null);
   const roundStartIndexRef = useRef<number | null>(null);
+  const lastRoundIndexRef = useRef<number | null>(null);
+  const forceShowRulesRef = useRef(false);
+  const startedRoundIndexRef = useRef<number | null>(null);
+
+  const hasActiveRoundContent = useMemo(
+    () =>
+      Boolean(
+        gameState?.current_question ||
+          gameState?.buzzed_team_id ||
+          gameState?.time_remaining !== null ||
+          (gameState?.round_data as any)?.lightning?.question ||
+          (gameState?.round_data as any)?.quick_build?.phase ||
+          (gameState?.round_data as any)?.connect4?.question ||
+          (gameState?.round_data as any)?.guess_number?.prompt ||
+          (gameState?.round_data as any)?.blind_draw?.phase ||
+          (gameState?.round_data as any)?.dump_charades?.phase
+      ),
+    [gameState]
+  );
 
   const updateScore = (teamId: string, points: number) => {
     if (!gameId) {
       onUpdateLocalScore?.(teamId, points);
       return;
     }
-    updateTeamScore(teamId, points).catch(() => undefined);
+    updateTeamScore(teamId, points)
+      .then(team => {
+        setOptimisticScores(prev => ({
+          ...prev,
+          [team.id]: team.score,
+        }));
+      })
+      .catch(() => undefined);
   };
+
+  useEffect(() => {
+    if (syncedTeams.length === 0) return;
+    setOptimisticScores({});
+  }, [syncedTeams]);
 
   const nextRound = () => {
     if (currentRoundIndex < rounds.length - 1) {
@@ -102,10 +146,84 @@ export function GameController({
 
   const handleStartRound = () => {
     setShowInstructions(false);
+    forceShowRulesRef.current = false;
+    startedRoundIndexRef.current = currentRoundIndex;
+    if (gameId) {
+      const roundData = {
+        ...(gameState?.round_data || {}),
+        show_rules: false,
+        rules_ack_round: currentRoundIndex,
+      };
+      updateGameState(gameId, {
+        round_data: roundData,
+      }).catch(() => undefined);
+      return;
+    }
+    if (gameState?.round_data) {
+      const roundData = {
+        ...(gameState?.round_data || {}),
+        show_rules: false,
+      };
+      updateGameState(gameId, {
+        round_data: roundData,
+      }).catch(() => undefined);
+    }
   };
   
   const handleSkipRound = () => {
-    handleCompleteRound();
+    if (currentRoundIndex < rounds.length - 1) {
+      finalizeRoundScores();
+      const nextIndex = currentRoundIndex + 1;
+      const nextRound = rounds[nextIndex];
+      if (gameId) {
+        updateGame(gameId, {
+          status: 'in_progress',
+          current_round: nextIndex,
+          current_round_type: nextRound,
+        }).catch(() => undefined);
+        const roundData = {
+          ...(gameState?.round_data || {}),
+          show_rules: true,
+          trivia: null,
+          lightning: null,
+          quick_build: null,
+          connect4: null,
+          guess_number: null,
+          blind_draw: null,
+          dump_charades: null,
+        };
+        updateGameState(gameId, {
+          current_question: null,
+          current_category: null,
+          current_points: null,
+          can_buzz: false,
+          buzzed_team_id: null,
+          time_remaining: null,
+          round_data: roundData,
+        }).catch(() => undefined);
+      }
+      setCurrentRoundIndex(nextIndex);
+      setShowInstructions(true);
+      setShowTransition(false);
+    } else {
+      finalizeRoundScores();
+      setGameComplete(true);
+      setShowInstructions(false);
+      if (gameId) {
+        updateGame(gameId, {
+          status: 'completed',
+          current_round: currentRoundIndex,
+          current_round_type: rounds[currentRoundIndex],
+        }).catch(() => undefined);
+        const roundData = {
+          ...(gameState?.round_data || {}),
+          show_rules: false,
+        };
+        updateGameState(gameId, {
+          round_data: roundData,
+        }).catch(() => undefined);
+      }
+    }
   };
 
   const handleCompleteRound = () => {
@@ -134,11 +252,55 @@ export function GameController({
     if (game.status === 'completed') {
       setGameComplete(true);
     }
-    const showRules = (gameState?.round_data as any)?.show_rules;
+    const roundData = (gameState?.round_data as any) || {};
+    const showRules = roundData.show_rules;
     if (typeof showRules === 'boolean') {
-      setShowInstructions(showRules);
+      if (roundData.rules_ack_round === currentRoundIndex && showRules) {
+        setShowInstructions(false);
+      } else if (startedRoundIndexRef.current === currentRoundIndex && showRules) {
+        setShowInstructions(false);
+      } else if (forceShowRulesRef.current && showRules) {
+        setShowInstructions(true);
+      } else if (showRules && hasActiveRoundContent) {
+        setShowInstructions(false);
+      } else {
+        setShowInstructions(showRules);
+      }
+      return;
     }
-  }, [game, gameState, currentRoundIndex]);
+    if (game.status === 'in_progress' && hasActiveRoundContent) {
+      setShowInstructions(false);
+    }
+  }, [game, gameState, currentRoundIndex, hasActiveRoundContent]);
+
+  useEffect(() => {
+    if (lastRoundIndexRef.current === currentRoundIndex) return;
+    lastRoundIndexRef.current = currentRoundIndex;
+    forceShowRulesRef.current = true;
+    startedRoundIndexRef.current = null;
+    setShowInstructions(true);
+    if (!gameId) return;
+    const roundData = {
+      ...(gameState?.round_data || {}),
+      show_rules: true,
+      trivia: null,
+      lightning: null,
+      quick_build: null,
+      connect4: null,
+      guess_number: null,
+      blind_draw: null,
+      dump_charades: null,
+    };
+    updateGameState(gameId, {
+      current_question: null,
+      current_category: null,
+      current_points: null,
+      can_buzz: false,
+      buzzed_team_id: null,
+      time_remaining: null,
+      round_data: roundData,
+    }).catch(() => undefined);
+  }, [currentRoundIndex, gameId, gameState]);
 
   useEffect(() => {
     if (!gameId || !currentRound) return;
@@ -182,7 +344,7 @@ export function GameController({
     }));
     setRoundBreakdowns(prev => {
       const next = [...prev];
-      next[startIndex] = { roundType: rounds[startIndex], scores };
+      next[startIndex] = { roundIndex: startIndex, roundType: rounds[startIndex], scores };
       return next;
     });
   };
@@ -219,33 +381,35 @@ export function GameController({
             <Scoreboard teams={teams} />
           </div>
 
-          {roundBreakdowns.length > 0 && (
+            {roundBreakdowns.some(Boolean) && (
             <div className="mb-10 text-left max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-4 text-center">Round Breakdown</h2>
               <div className="space-y-4">
-                {roundBreakdowns.map((round, index) => (
-                  <div
-                    key={`${round.roundType}-${index}`}
-                    className="bg-white/10 border border-white/20 rounded-xl p-4"
-                  >
-                    <div className="text-white font-bold mb-3">
-                      Round {index + 1}: {ROUND_NAMES[round.roundType]}
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      {round.scores.map(score => (
-                        <div
-                          key={score.teamId}
-                          className="flex items-center justify-between px-3 py-2 rounded-lg"
-                        >
-                          <span className="text-white">{score.teamName}</span>
-                          <span className="text-blue-100 font-semibold">
-                            {score.points >= 0 ? `+${score.points}` : score.points}
-                          </span>
+                  {roundBreakdowns
+                    .filter((round): round is { roundIndex: number; roundType: RoundType; scores: Array<{ teamId: string; teamName: string; points: number }> } => Boolean(round))
+                    .map(round => (
+                      <div
+                        key={`${round.roundType}-${round.roundIndex}`}
+                        className="bg-white/10 border border-white/20 rounded-xl p-4"
+                      >
+                        <div className="text-white font-bold mb-3">
+                          Round {round.roundIndex + 1}: {ROUND_NAMES[round.roundType]}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {round.scores.map(score => (
+                            <div
+                              key={score.teamId}
+                              className="flex items-center justify-between px-3 py-2 rounded-lg"
+                            >
+                              <span className="text-white">{score.teamName}</span>
+                              <span className="text-blue-100 font-semibold">
+                                {score.points >= 0 ? `+${score.points}` : score.points}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
               </div>
             </div>
           )}
@@ -262,27 +426,33 @@ export function GameController({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-8">
-      {/* Floating Game Code */}
-      <HostGameCode gameCode={gameCode || '------'} onSkipRound={skipRound} onReset={onReset} />
-      
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header with Scoreboard */}
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-4xl font-bold text-white">Game Show</h1>
-              <p className="text-blue-200">
+              <h1 className="text-2xl sm:text-4xl font-bold text-white">Game Show</h1>
+              <p className="text-sm sm:text-base text-blue-200">
                 Round {currentRoundIndex + 1} of {rounds.length} • {ROUND_NAMES[currentRound]}
               </p>
             </div>
+            <HostGameCode
+              gameCode={gameCode || '------'}
+              onSkipRound={skipRound}
+              onReset={onReset}
+              teams={teams}
+              players={syncedPlayers}
+            />
           </div>
-          <Scoreboard teams={teams} compact />
+          <div className="mt-2 sm:mt-4">
+            <Scoreboard teams={teams} compact />
+          </div>
         </div>
 
-        {/* Round Progress */}
-        <div className="mb-8">
-          <div className="flex gap-2 justify-center">
+        {/* Round Progress (desktop only) */}
+        <div className="mb-6 sm:mb-8 hidden sm:block">
+          <div className="flex gap-2 justify-center opacity-60">
             {rounds.map((round, index) => (
               <div
                 key={index}
@@ -379,6 +549,16 @@ export function GameController({
                   gameId={gameId}
                   words={effectiveQuestions.blindDraw}
                   durationSeconds={roundSettings.blindDrawSeconds}
+                />
+              )}
+              {currentRound === 'dump-charades' && (
+                <DumpCharades
+                  teams={teams}
+                  onUpdateScore={updateScore}
+                  onComplete={nextRound}
+                  gameId={gameId}
+                  words={effectiveQuestions.dumpCharades}
+                  durationSeconds={roundSettings.dumpCharadesSeconds}
                 />
               )}
             </motion.div>

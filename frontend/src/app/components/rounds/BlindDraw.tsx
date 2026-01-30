@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Team, BlindDrawState, Difficulty } from '@/app/types/game';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Timer } from '@/app/components/Timer';
-import { getRandomDrawWord } from '@/app/data/questions';
+import { blindDrawWords, getRandomDrawWord } from '@/app/data/questions';
 import { Pencil, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { updateGameState } from '@/services/gameService';
@@ -40,9 +40,9 @@ export function BlindDraw({
   const [phase, setPhase] = useState<'prep' | 'drawing' | 'judging' | 'complete'>('prep');
   const [roundsCompleted, setRoundsCompleted] = useState(0);
   const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
-  const [wordIndex, setWordIndex] = useState(0);
   const [result, setResult] = useState<'guessed' | 'missed' | null>(null);
   const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
+  const usedWordsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!state.isActive) return;
@@ -64,7 +64,6 @@ export function BlindDraw({
 
   useEffect(() => {
     if (!gameId) return;
-    const roundPhase = phase === 'prep' ? 'drawing' : phase;
     const roundData = {
       ...(gameState?.round_data || {}),
       blind_draw: {
@@ -73,7 +72,8 @@ export function BlindDraw({
         drawer_player_id: drawerPlayerId,
         time_remaining: state.timeRemaining,
         total_time: roundSeconds,
-        phase: roundPhase,
+        is_active: state.isActive,
+        phase: phase,
         result: result,
       },
     };
@@ -83,11 +83,32 @@ export function BlindDraw({
     }).catch(() => undefined);
   }, [gameId, gameState, state.currentWord, state.timeRemaining, state.isActive, state.guessedCorrectly, state.drawingTeam, drawerPlayerId, phase, result, roundSeconds]);
 
+  const getWordPool = () => {
+    if (words && words.length) return words;
+    return difficulty === 'easy'
+      ? blindDrawWords.easy
+      : difficulty === 'hard'
+      ? blindDrawWords.hard
+      : blindDrawWords.medium;
+  };
+
+  const pickUnusedWord = () => {
+    const pool = getWordPool();
+    if (!pool.length) {
+      return getRandomDrawWord(difficulty);
+    }
+    const available = pool.filter(word => !usedWordsRef.current.has(word));
+    if (!available.length) {
+      return null;
+    }
+    const nextWord = available[Math.floor(Math.random() * available.length)];
+    usedWordsRef.current.add(nextWord);
+    return nextWord;
+  };
+
   const startDrawing = () => {
-    const word =
-      words && words.length
-        ? words[wordIndex % words.length]
-        : getRandomDrawWord(difficulty);
+    const word = pickUnusedWord();
+    if (!word) return;
     setState({
       currentWord: word,
       drawingTeam: teams[currentTeamIndex].id,
@@ -97,7 +118,25 @@ export function BlindDraw({
     });
     setPhase('drawing');
     setResult(null);
-    setWordIndex(prev => prev + 1);
+    if (gameId) {
+      updateGameState(gameId, {
+        round_data: {
+          blind_draw: {
+            drawing_data: null,
+          },
+        },
+      }).catch(() => undefined);
+    }
+  };
+
+  const rerollWord = () => {
+    if (phase !== 'drawing' || state.isActive) return;
+    const nextWord = pickUnusedWord();
+    if (!nextWord) return;
+    setState(prev => ({
+      ...prev,
+      currentWord: nextWord,
+    }));
   };
 
   const startTimer = () => {
@@ -136,10 +175,20 @@ export function BlindDraw({
     setPhase('prep');
     setResult(null);
     setDrawerPlayerId(null);
+    if (gameId) {
+      updateGameState(gameId, {
+        round_data: {
+          blind_draw: {
+            drawing_data: null,
+          },
+        },
+      }).catch(() => undefined);
+    }
   };
 
   const drawingTeam = teams.find(t => t.id === state.drawingTeam);
   const currentTeam = teams[currentTeamIndex];
+  const drawingData = (gameState?.round_data as any)?.blind_draw?.drawing_data as string | null;
   const teamPlayers = useMemo(
     () => players.filter(player => player.team_id === currentTeam?.id),
     [players, currentTeam]
@@ -159,10 +208,10 @@ export function BlindDraw({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-2">🎨 Blind Draw</h2>
-        <p className="text-blue-200">Draw while blindfolded - can your team guess?</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">🎨 Blind Draw</h2>
+        <p className="text-blue-200 text-sm sm:text-base">Draw while blindfolded - can your team guess?</p>
         {state.drawingTeam && (
           <div className="mt-4">
             <div
@@ -253,10 +302,20 @@ export function BlindDraw({
                     Give this word to the drawing player.
                   </p>
                 </div>
-            {!state.isActive && phase === 'drawing' && (
-                  <Button onClick={startTimer} size="lg" className="w-full bg-blue-600 hover:bg-blue-700">
-                Start Drawing
-                  </Button>
+                {!state.isActive && phase === 'drawing' && (
+                  <div className="space-y-2">
+                    <Button onClick={startTimer} size="lg" className="w-full bg-blue-600 hover:bg-blue-700">
+                      Start Drawing
+                    </Button>
+                    <Button
+                      onClick={rerollWord}
+                      size="lg"
+                      variant="outline"
+                      className="w-full border-white/30 text-white bg-white/10 hover:bg-white/20"
+                    >
+                      Pick Another Word
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -294,6 +353,18 @@ export function BlindDraw({
           </div>
 
           <div className="space-y-4">
+            {drawingData && (
+              <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+                <CardContent className="pt-6">
+                  <h3 className="text-white font-bold mb-3 text-center">Live Drawing</h3>
+                  <img
+                    src={drawingData}
+                    alt="Live drawing"
+                    className="w-full h-auto rounded-lg border border-white/20"
+                  />
+                </CardContent>
+              </Card>
+            )}
             {phase === 'drawing' && state.isActive && (
               <Card className="bg-white/10 backdrop-blur-sm border-white/20">
                 <CardContent className="pt-6 flex flex-col items-center">

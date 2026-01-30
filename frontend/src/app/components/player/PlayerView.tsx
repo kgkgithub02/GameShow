@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Info } from 'lucide-react';
@@ -11,6 +11,7 @@ import { PlayerQuickBuild } from './rounds/PlayerQuickBuild';
 import { PlayerConnect4 } from './rounds/PlayerConnect4';
 import { PlayerGuessNumber } from './rounds/PlayerGuessNumber';
 import { PlayerBlindDraw } from './rounds/PlayerBlindDraw';
+import { PlayerDumpCharades } from './rounds/PlayerDumpCharades';
 import { sendBuzz } from '@/services/buzzService';
 import { useGameSync } from '@/hooks/useGameSync';
 import { formatGameCode } from '@/app/utils/gameCode';
@@ -32,6 +33,7 @@ type RoundData = Record<string, any>;
 export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, teamName, teamColor }: PlayerViewProps) {
   const { game, teams, gameState, players, loading, error } = useGameSync(gameId, 1000);
   const [showRules, setShowRules] = useState(true);
+  const lastRoundIndexRef = useRef<number | null>(null);
 
   const roundType = game?.current_round_type || 'trivia-buzz';
   const gameComplete = game?.status === 'completed';
@@ -45,6 +47,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
     'connect-4': 'Connect 4',
     'guess-number': 'Guess the Number',
     'blind-draw': 'Blind Draw',
+    'dump-charades': 'Dump Charades',
   };
   const roundIconMap: Record<RoundType, string> = {
     'trivia-buzz': '⚡',
@@ -53,6 +56,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
     'connect-4': '🎯',
     'guess-number': '🔢',
     'blind-draw': '🎨',
+    'dump-charades': '🎭',
   };
   const roundIconByName: Record<string, string> = {
     'Trivia Buzz': roundIconMap['trivia-buzz'],
@@ -61,6 +65,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
     'Connect 4': roundIconMap['connect-4'],
     'Guess the Number': roundIconMap['guess-number'],
     'Blind Draw': roundIconMap['blind-draw'],
+    'Dump Charades': roundIconMap['dump-charades'],
   };
   const currentRoundName = roundNameMap[roundType as RoundType] || 'Trivia Buzz';
   const currentRoundIcon = roundIconMap[roundType as RoundType] || '🎮';
@@ -73,17 +78,23 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
       roundData.quick_build?.phase ||
       roundData.connect4?.question ||
       roundData.guess_number?.prompt ||
-      roundData.blind_draw?.phase
+      roundData.blind_draw?.phase ||
+      roundData.dump_charades?.phase
   );
 
   useEffect(() => {
-    if (hasActiveRoundContent) {
-      setShowRules(false);
-      return;
+    if (typeof game?.current_round === 'number' && lastRoundIndexRef.current !== game.current_round) {
+      lastRoundIndexRef.current = game.current_round;
+      setShowRules(true);
     }
 
     if (typeof roundData.show_rules === 'boolean') {
       setShowRules(roundData.show_rules);
+      return;
+    }
+
+    if (hasActiveRoundContent) {
+      setShowRules(false);
       return;
     }
 
@@ -93,6 +104,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
     roundNumber,
     roundData.show_rules,
     hasActiveRoundContent,
+    game,
   ]);
 
   useEffect(() => {
@@ -123,6 +135,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
           players.find(player => player.id === buzzedPlayerId)?.name ||
           (teamPlayers.length === 1 ? teamPlayers[0].name : null) ||
           null;
+        const incorrectTeamId = (roundData?.trivia as any)?.incorrect_team_id || null;
         return (
           <PlayerTriviaBuzz
             question={gameState?.current_question || null}
@@ -131,27 +144,39 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
             canBuzz={!!gameState?.can_buzz}
             buzzedTeam={gameState?.buzzed_team_id || null}
             buzzedPlayerName={buzzedPlayerName}
+            incorrectTeamId={incorrectTeamId}
             teamId={teamId}
             teamColor={teamColor}
             timeRemaining={gameState?.time_remaining || undefined}
             answer={roundData.trivia?.answer}
             showAnswer={roundData.trivia?.show_answer}
             onBuzz={async () => {
-              await sendBuzz(
-                gameId,
-                teamId,
-                playerId,
-                playerName,
-                gameState?.current_question || undefined
-              );
-              await updateGameState(gameId, {
-                round_data: {
-                  trivia: {
-                    buzzed_player_id: playerId,
-                    buzzed_player_name: playerName,
+              try {
+                if (incorrectTeamId && incorrectTeamId === teamId) {
+                  return false;
+                }
+                const response = await sendBuzz(
+                  gameId,
+                  teamId,
+                  playerId,
+                  playerName,
+                  gameState?.current_question || undefined
+                );
+                if (!response?.success) {
+                  return false;
+                }
+                await updateGameState(gameId, {
+                  round_data: {
+                    trivia: {
+                      buzzed_player_id: playerId,
+                      buzzed_player_name: playerName,
+                    },
                   },
-                },
-              });
+                });
+                return true;
+              } catch {
+                return false;
+              }
             }}
           />
         );
@@ -180,8 +205,8 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
         return (
           <PlayerQuickBuild
             challenge={roundData.quick_build?.challenge || 'Build the tallest tower'}
-            timeRemaining={roundData.quick_build?.time_remaining || 180}
-            totalTime={roundData.quick_build?.total_time || 180}
+            timeRemaining={roundData.quick_build?.time_remaining ?? roundData.quick_build?.total_time ?? 60}
+            totalTime={roundData.quick_build?.total_time ?? roundData.quick_build?.time_remaining ?? 60}
             phase={roundData.quick_build?.phase || 'building'}
             teamColor={teamColor}
             winnerName={winnerTeamName}
@@ -304,15 +329,39 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
         const isDrawer = drawerPlayerId === playerId;
         const drawerTeamId = roundData.blind_draw?.drawer_team_id || null;
         const isGuessingTeam = drawerTeamId === teamId;
+        const blindDrawPhase = roundData.blind_draw?.phase || 'prep';
+        const blindDrawWord = roundData.blind_draw?.word || null;
         return (
           <PlayerBlindDraw
-            word={isDrawer ? roundData.blind_draw?.word : null}
+            word={isDrawer || blindDrawPhase === 'complete' ? blindDrawWord : null}
             isDrawer={isDrawer}
             isGuessingTeam={isGuessingTeam}
             timeRemaining={roundData.blind_draw?.time_remaining ?? 60}
             teamColor={teamColor}
-            phase={roundData.blind_draw?.phase || 'drawing'}
+            isActive={!!roundData.blind_draw?.is_active}
+            drawingData={roundData.blind_draw?.drawing_data || null}
+            gameId={gameId}
+            phase={blindDrawPhase}
             result={roundData.blind_draw?.result || null}
+          />
+        );
+
+      case 'Dump Charades':
+        const actorPlayerId = roundData.dump_charades?.actor_player_id || null;
+        const isActor = actorPlayerId === playerId;
+        const actorTeamId = roundData.dump_charades?.actor_team_id || null;
+        const isActingTeam = actorTeamId === teamId;
+        const dumpCharadesPhase = roundData.dump_charades?.phase || 'prep';
+        const dumpCharadesWord = roundData.dump_charades?.word || null;
+        return (
+          <PlayerDumpCharades
+            word={isActor || dumpCharadesPhase === 'complete' ? dumpCharadesWord : null}
+            isActor={isActor}
+            isGuessingTeam={isActingTeam}
+            timeRemaining={roundData.dump_charades?.time_remaining ?? 60}
+            isActive={!!roundData.dump_charades?.is_active}
+            phase={dumpCharadesPhase}
+            result={roundData.dump_charades?.result || null}
           />
         );
       
@@ -511,16 +560,7 @@ export function PlayerView({ gameId, gameCode, playerId, playerName, teamId, tea
           </AnimatePresence>
 
           {/* Info Button */}
-          {!hasActiveRoundContent && (
-            <Button
-              onClick={() => setShowRules(!showRules)}
-              variant="outline"
-              className="w-full border-white/30 bg-white/10 text-white hover:bg-white/20"
-            >
-              <Info className="mr-2 h-4 w-4" />
-              {showRules ? 'Hide Rules' : 'Show Rules'}
-            </Button>
-          )}
+          
 
         </div>
       </div>
